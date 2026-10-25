@@ -1,6 +1,6 @@
 module github.com/gelozr/himo
 
-go 1.24.4
+go 1.26.0
 
 require (
 	github.com/alexedwards/argon2id v1.0.0

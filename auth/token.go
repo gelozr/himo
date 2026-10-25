@@ -4,14 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Errors returned by JWTDriver.
 var (
 	ErrJWTExpired = errors.New("JWT is expired")
 	ErrJWTInvalid = errors.New("JWT is invalid")
+	ErrJWTRevoked = errors.New("JWT is revoked")
 )
 
 // TokenDriver defines the contract for token-based authentication drivers.
@@ -22,99 +25,62 @@ type TokenDriver[U, P any] interface {
 	IssueToken(ctx context.Context, user U) (P, error)
 }
 
-// TokenAuth is a generic authentication handler for token-based flows.
-// It embeds BaseAuth for Authenticate/Validate, and adds token issuance,
-// refresh, and revocation capabilities via TokenDriver.
-//
-// C - credential type for Authenticate (e.g., login form struct)
-// U - user type returned by Authenticate
-// P - token type used by Validate and IssueToken
-type TokenAuth[C, U, P any] struct {
-	BaseAuth[C, U, P]
-	driver TokenDriver[U, P]
-}
-
-// Compile-time checks that TokenAuth implements the dynamic handler interfaces.
-var (
-	_ AnyHandler            = (*TokenAuth[any, any, any])(nil)
-	_ TokenIssuer[any, any] = (*TokenAuth[any, any, any])(nil)
-	_ TokenRefresher[any]   = (*TokenAuth[any, any, any])(nil)
-	_ TokenRevoker          = (*TokenAuth[any, any, any])(nil)
+const (
+	jwtTTL = 15 * time.Minute
+	// jwtMaxLoginAge caps how long RefreshToken can extend one login before the user must sign in again.
+	jwtMaxLoginAge = 7 * 24 * time.Hour
+	// sweepInterval limits how often expired entries are removed, so the O(n) scan can't run on every call.
+	sweepInterval = time.Minute
 )
-
-// NewTokenAuth constructs a new TokenAuth with the given TokenDriver and UserProvider.
-func NewTokenAuth[C, U, P any, D TokenDriver[U, P], UP UserProvider[C, U]](driver D, userProvider UP) *TokenAuth[C, U, P] {
-	return &TokenAuth[C, U, P]{
-		BaseAuth: BaseAuth[C, U, P]{userProvider: userProvider},
-		driver:   driver,
-	}
-}
-
-// Validate delegates proof validation to the token driver, returning a Verified user.
-func (t *TokenAuth[C, U, P]) Validate(ctx context.Context, token P) (Verified[U], error) {
-	return t.driver.Validate(ctx, token)
-}
-
-// IssueToken delegates token creation to the token driver for the given user.
-func (t *TokenAuth[C, U, P]) IssueToken(ctx context.Context, user U) (P, error) {
-	return t.driver.IssueToken(ctx, user)
-}
-
-// RefreshToken checks if the driver supports token refreshing and delegates to it.
-// Returns ErrRefreshTokenNotSupported if unsupported.
-func (t *TokenAuth[C, U, P]) RefreshToken(ctx context.Context, token string) (P, error) {
-	if d, ok := t.driver.(TokenRefresher[P]); ok {
-		return d.RefreshToken(ctx, token)
-	}
-
-	var zero P
-	return zero, ErrRefreshTokenNotSupported
-}
-
-// RevokeToken checks if the driver supports token revocation and delegates to it.
-// Returns ErrRevokeTokenNotSupported if unsupported.
-func (t *TokenAuth[C, U, P]) RevokeToken(ctx context.Context, token string) error {
-	if d, ok := t.driver.(TokenRevoker); ok {
-		return d.RevokeToken(ctx, token)
-	}
-
-	return ErrRevokeTokenNotSupported
-}
 
 // Claims represents the JWT payload structure used by JWTDriver.
 type Claims struct {
-	UserID string
+	UserID   string
+	AuthTime *jwt.NumericDate `json:"auth_time,omitempty"` // when the user logged in; kept across refreshes
 	jwt.RegisteredClaims
 }
 
-// JWTDriver is a simple JWT-based TokenDriver implementation.
-// It signs and parses JWTs using an HMAC verify key.
+// JWTDriver is a JWT-based TokenDriver signed with HMAC-SHA256.
+// Revoked token IDs are kept in memory until the token would expire anyway,
+// so revocations are lost on restart and not shared between processes.
 type JWTDriver struct {
 	verifyKey []byte
+
+	mu        sync.Mutex
+	revoked   map[string]time.Time // token ID -> token expiry
+	lastSweep time.Time
 }
 
-// Compile-time checks that JWTDriver implements the Validator and TokenIssuer interfaces.
-var _ Validator[any, any] = (*JWTDriver)(nil)
-var _ TokenIssuer[any, any] = (*JWTDriver)(nil)
+var (
+	_ TokenDriver[any, any] = (*JWTDriver)(nil)
+	_ TokenRefresher[any]   = (*JWTDriver)(nil)
+	_ TokenRevoker          = (*JWTDriver)(nil)
+)
 
-// NewJWTDriver creates a JWTDriver with a default HMAC verify key.
-// In production, replace with secure key management.
-func NewJWTDriver() *JWTDriver {
+// NewJWTDriver creates a JWTDriver that signs and verifies tokens with key.
+// It panics if key is empty.
+func NewJWTDriver(key []byte) *JWTDriver {
+	if len(key) == 0 {
+		panic("auth: JWT key must not be empty")
+	}
 	return &JWTDriver{
-		verifyKey: []byte("verifyKey"),
+		verifyKey: key,
+		revoked:   make(map[string]time.Time),
 	}
 }
 
 // Sign generates a signed JWT string and returns its expiration time.
-func (d *JWTDriver) Sign(uid string) (string, time.Time, error) {
-	exp := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
+// authTime is when the user logged in; RefreshToken refuses tokens older than jwtMaxLoginAge.
+func (d *JWTDriver) Sign(uid string, authTime time.Time) (string, time.Time, error) {
+	now := time.Now()
 
 	c := Claims{}
 	c.UserID = uid
+	c.AuthTime = jwt.NewNumericDate(authTime)
 	c.ID = uniqid()
-	c.IssuedAt = jwt.NewNumericDate(time.Now())
-	c.ExpiresAt = exp
-	c.NotBefore = jwt.NewNumericDate(time.Now())
+	c.IssuedAt = jwt.NewNumericDate(now)
+	c.ExpiresAt = jwt.NewNumericDate(now.Add(jwtTTL))
+	c.NotBefore = jwt.NewNumericDate(now)
 
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
 
@@ -123,15 +89,16 @@ func (d *JWTDriver) Sign(uid string) (string, time.Time, error) {
 		return "", time.Time{}, fmt.Errorf("signing token: %w", err)
 	}
 
-	return signed, exp.Time, nil
+	return signed, c.ExpiresAt.Time, nil
 }
 
 // Parse validates and decodes a JWT string into Claims.
-// It maps JWT parsing errors to ErrJWTInvalid or ErrJWTExpired.
+// Every error matches ErrJWTExpired or ErrJWTInvalid.
+// It does not check revocation; Validate does.
 func (d *JWTDriver) Parse(tokenStr string) (Claims, error) {
-	tok, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (any, error) {
+	tok, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(*jwt.Token) (any, error) {
 		return d.verifyKey, nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired())
 
 	if err != nil {
 		switch {
@@ -140,7 +107,7 @@ func (d *JWTDriver) Parse(tokenStr string) (Claims, error) {
 		case errors.Is(err, jwt.ErrTokenExpired):
 			return Claims{}, ErrJWTExpired
 		default:
-			return Claims{}, fmt.Errorf("parsing token: %w", err)
+			return Claims{}, fmt.Errorf("%w: %w", ErrJWTInvalid, err)
 		}
 	}
 
@@ -152,24 +119,22 @@ func (d *JWTDriver) Parse(tokenStr string) (Claims, error) {
 }
 
 // IssueToken creates a JWT for the given user (expected as *User).
-// Implements the TokenIssuer interface.
-func (d *JWTDriver) IssueToken(ctx context.Context, usr any) (any, error) {
+func (d *JWTDriver) IssueToken(_ context.Context, usr any) (any, error) {
 	u, ok := usr.(*User)
-	if !ok {
-		return "", errors.New("invalid user")
+	if !ok || u.ID == "" {
+		return nil, ErrInvalidUser
 	}
 
-	jwtStr, _, err := d.Sign(u.ID)
+	jwtStr, _, err := d.Sign(u.ID, time.Now())
 	if err != nil {
-		return "", fmt.Errorf("sign jwt: %w", err)
+		return nil, fmt.Errorf("sign jwt: %w", err)
 	}
 
 	return jwtStr, nil
 }
 
 // Validate parses and validates the JWT, returning a Verified[any] with the user.
-// Implements the Validator interface.
-func (d *JWTDriver) Validate(ctx context.Context, proof any) (Verified[any], error) {
+func (d *JWTDriver) Validate(_ context.Context, proof any) (Verified[any], error) {
 	token, ok := proof.(string)
 	if !ok {
 		return Verified[any]{}, ErrJWTInvalid
@@ -180,7 +145,77 @@ func (d *JWTDriver) Validate(ctx context.Context, proof any) (Verified[any], err
 		return Verified[any]{}, fmt.Errorf("parse token: %w", err)
 	}
 
+	d.mu.Lock()
+	_, revoked := d.revoked[claims.ID]
+	d.mu.Unlock()
+	if revoked {
+		return Verified[any]{}, ErrJWTRevoked
+	}
+
 	return Verified[any]{
 		User: &User{ID: claims.UserID},
 	}, nil
+}
+
+// RefreshToken exchanges a valid, unexpired token for a new one and revokes the old one.
+// There is no separate long-lived refresh token: a client must refresh before expiry,
+// and must log in again once the original login is older than jwtMaxLoginAge.
+func (d *JWTDriver) RefreshToken(_ context.Context, token string) (any, error) {
+	claims, err := d.Parse(token)
+	if err != nil {
+		return nil, fmt.Errorf("parse token: %w", err)
+	}
+	if claims.AuthTime == nil || time.Since(claims.AuthTime.Time) > jwtMaxLoginAge {
+		return nil, ErrJWTExpired
+	}
+
+	if !d.revoke(claims) {
+		return nil, ErrJWTRevoked
+	}
+
+	jwtStr, _, err := d.Sign(claims.UserID, claims.AuthTime.Time)
+	if err != nil {
+		return nil, fmt.Errorf("sign jwt: %w", err)
+	}
+
+	return jwtStr, nil
+}
+
+// RevokeToken makes a token unusable before it expires. Expired tokens are a no-op.
+func (d *JWTDriver) RevokeToken(_ context.Context, token string) error {
+	claims, err := d.Parse(token)
+	if errors.Is(err, ErrJWTExpired) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("parse token: %w", err)
+	}
+
+	d.revoke(claims)
+	return nil
+}
+
+// revoke records the token ID as revoked. It returns false if it already was,
+// so concurrent refreshes of the same token can't both succeed.
+func (d *JWTDriver) revoke(c Claims) bool {
+	now := time.Now()
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	// shortcut: in-memory and per process, so revocations aren't shared between instances; use a shared store for that.
+	if now.Sub(d.lastSweep) > sweepInterval {
+		for id, exp := range d.revoked {
+			if now.After(exp) {
+				delete(d.revoked, id)
+			}
+		}
+		d.lastSweep = now
+	}
+
+	if _, ok := d.revoked[c.ID]; ok {
+		return false
+	}
+	d.revoked[c.ID] = c.ExpiresAt.Time
+	return true
 }

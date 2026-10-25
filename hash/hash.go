@@ -1,20 +1,25 @@
+// Package hash hashes and verifies passwords with bcrypt or argon2id.
 package hash
 
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/alexedwards/argon2id"
 	"golang.org/x/crypto/bcrypt"
 )
 
+// ErrHasherNotFound is returned when no Hasher is registered for a Method.
 var (
 	ErrHasherNotFound = errors.New("hasher not found")
 )
 
+// Method names a hashing algorithm.
 type Method string
 
+// Built-in Methods.
 const (
 	Bcrypt   Method = "bcrypt"
 	Argon2ID Method = "argon2id"
@@ -26,15 +31,7 @@ type Hasher interface {
 	Check(password, hash string) (bool, error)
 }
 
-// Provider looks up a Hasher by Method.
-type Provider interface {
-	Hasher(Method) (Hasher, error)
-
-	// MustHasher returns the Hasher for the given Method or panics if not found.
-	MustHasher(Method) Hasher
-}
-
-// Manager is a thread-safe implementation of Provider with default and custom hashers.
+// Manager is a thread-safe registry of hashers with a default Method.
 type Manager struct {
 	mu            sync.RWMutex
 	hashers       map[Method]Hasher
@@ -56,12 +53,30 @@ func New() *Manager {
 
 // Hash generates a password hash using the default Method.
 func (m *Manager) Hash(password string) (string, error) {
-	return m.MustHasher(m.defaultHasher).Hash(password)
+	return m.MustHasher(m.defaultMethod()).Hash(password)
 }
 
-// Check verifies a password against a hash using the default Method.
+// Check verifies a password against a hash. Bcrypt and argon2id hashes are
+// recognised by their prefix, so changing the default Method doesn't break
+// hashes that are already stored. Any other hash is checked with the default Method.
 func (m *Manager) Check(password, hash string) (bool, error) {
-	return m.MustHasher(m.defaultHasher).Check(password, hash)
+	return m.MustHasher(m.methodFor(hash)).Check(password, hash)
+}
+
+func (m *Manager) methodFor(hash string) Method {
+	switch {
+	case strings.HasPrefix(hash, "$argon2id$"):
+		return Argon2ID
+	case strings.HasPrefix(hash, "$2a$"), strings.HasPrefix(hash, "$2b$"), strings.HasPrefix(hash, "$2y$"):
+		return Bcrypt
+	}
+	return m.defaultMethod()
+}
+
+func (m *Manager) defaultMethod() Method {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.defaultHasher
 }
 
 // Hasher looks up a Hasher by Method. Returns ErrHasherNotFound if missing.
@@ -129,7 +144,7 @@ func Hash(password string) (string, error) {
 	return getManager().Hash(password)
 }
 
-// Check is a facade that verifies a hash using the default Method.
+// Check is a facade that verifies a hash, choosing the Method from the hash prefix (see Manager.Check).
 func Check(password, hash string) (bool, error) {
 	return getManager().Check(password, hash)
 }

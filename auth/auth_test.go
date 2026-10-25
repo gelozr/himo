@@ -17,7 +17,7 @@ type MockUserProvider struct {
 	findByCredentialsCalled bool
 }
 
-func (m *MockUserProvider) FindByCredentials(ctx context.Context, creds any) (any, error) {
+func (m *MockUserProvider) FindByCredentials(_ context.Context, _ any) (any, error) {
 	m.findByCredentialsCalled = true
 
 	if m.shouldFailCredentials {
@@ -33,7 +33,7 @@ type MockUserProviderWithRegister struct {
 	registerCalled     bool
 }
 
-func (m *MockUserProviderWithRegister) RegisterUser(ctx context.Context, u any) (any, error) {
+func (m *MockUserProviderWithRegister) RegisterUser(_ context.Context, _ any) (any, error) {
 	m.registerCalled = true
 
 	if m.shouldFailRegister {
@@ -49,7 +49,7 @@ type MockDriver struct {
 	user               *MockUser
 }
 
-func (m *MockDriver) Validate(ctx context.Context, proof any) (auth.Verified[any], error) {
+func (m *MockDriver) Validate(_ context.Context, _ any) (auth.Verified[any], error) {
 	m.validateCalled = true
 
 	var v auth.Verified[any]
@@ -70,7 +70,7 @@ type MockSessionDriver struct {
 	shouldFailLogout bool
 }
 
-func (m *MockSessionDriver) Login(ctx context.Context, user any) (string, error) {
+func (m *MockSessionDriver) Login(_ context.Context, _ any) (string, error) {
 	m.loginCalled = true
 
 	if m.shouldFailLogin {
@@ -79,7 +79,7 @@ func (m *MockSessionDriver) Login(ctx context.Context, user any) (string, error)
 	return "sessionID", nil
 }
 
-func (m *MockSessionDriver) Logout(ctx context.Context, sessionID string) error {
+func (m *MockSessionDriver) Logout(_ context.Context, _ string) error {
 	m.logoutCalled = true
 
 	if m.shouldFailLogout {
@@ -95,7 +95,7 @@ type MockTokenDriver struct {
 	shouldFailIssueToken bool
 }
 
-func (m *MockTokenDriver) IssueToken(ctx context.Context, user any) (any, error) {
+func (m *MockTokenDriver) IssueToken(_ context.Context, _ any) (any, error) {
 	m.issueTokenCalled = true
 
 	if m.shouldFailIssueToken {
@@ -111,7 +111,7 @@ type MockTokenRefresherDriver struct {
 	shouldFailRefreshToken bool
 }
 
-func (m *MockTokenRefresherDriver) RefreshToken(ctx context.Context, refreshToken string) (any, error) {
+func (m *MockTokenRefresherDriver) RefreshToken(_ context.Context, _ string) (any, error) {
 	m.refreshTokenCalled = true
 
 	if m.shouldFailRefreshToken {
@@ -127,7 +127,7 @@ type MockTokenRevokerDriver struct {
 	shouldFailRevokeToken bool
 }
 
-func (m *MockTokenRevokerDriver) RevokeToken(ctx context.Context, tokenID string) error {
+func (m *MockTokenRevokerDriver) RevokeToken(_ context.Context, _ string) error {
 	m.revokeTokenCalled = true
 
 	if m.shouldFailRevokeToken {
@@ -145,7 +145,7 @@ type MockHandler struct {
 	user                   *MockUser
 }
 
-func (m MockHandler) Authenticate(ctx context.Context, creds any) (any, error) {
+func (m *MockHandler) Authenticate(_ context.Context, _ any) (any, error) {
 	m.authenticateCalled = true
 	if m.shouldFailAuthenticate {
 		return nil, errors.New("mock error authenticate")
@@ -153,7 +153,7 @@ func (m MockHandler) Authenticate(ctx context.Context, creds any) (any, error) {
 	return m.user, nil
 }
 
-func (m MockHandler) Validate(ctx context.Context, proof any) (auth.Verified[any], error) {
+func (m *MockHandler) Validate(_ context.Context, _ any) (auth.Verified[any], error) {
 	m.validateCalled = true
 
 	var v auth.Verified[any]
@@ -195,7 +195,6 @@ func testExtend(t *testing.T, fn func(auth.HandlerOption) error) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if tt.panics {
@@ -247,7 +246,6 @@ func testSetDefault(t *testing.T, fn func(auth.HandlerOption, string) error) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := fn(auth.HandlerOption{Driver: &MockDriver{}, UserProvider: &MockUserProvider{}}, tt.handler)
@@ -272,7 +270,7 @@ func TestManager_SetDefault(t *testing.T) {
 }
 
 func Test_SetDefault(t *testing.T) {
-	t.Parallel()
+	// Not parallel: changes the default handler of the package-level Manager.
 	testSetDefault(t, func(opt auth.HandlerOption, handler string) error {
 		if err := auth.Extend("test", opt); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -301,7 +299,6 @@ func testRegisterHandler(t *testing.T, fn func(auth.HandlerOption, string) error
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := fn(auth.HandlerOption{Driver: &MockDriver{}, UserProvider: &MockUserProvider{}}, tt.handler)
@@ -351,7 +348,6 @@ func testMustHandler(t *testing.T, fn func(auth.HandlerOption, string)) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if tt.panics {
@@ -402,7 +398,6 @@ func testLookupHandler(t *testing.T, fn func(auth.HandlerOption, string) (auth.A
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			h, err := fn(auth.HandlerOption{UserProvider: &MockUserProvider{}, Driver: &MockDriver{}}, tt.handler)
@@ -419,9 +414,6 @@ func testLookupHandler(t *testing.T, fn func(auth.HandlerOption, string) (auth.A
 				t.Fatalf("LookupHandler() expected non-nil")
 			}
 
-			if _, ok := h.(auth.AnyHandler); !ok && !tt.wantErr {
-				t.Errorf("LookupHandler() expected AnyHandler")
-			}
 		})
 	}
 }
@@ -988,7 +980,6 @@ func Test_RevokeToken(t *testing.T) {
 }
 
 func TestUseDriver(t *testing.T) {
-	t.Parallel()
 	driver := &MockDriver{user: &MockUser{ID: "fromUseDriver"}}
 	auth.UseDriver(driver)
 
@@ -1012,7 +1003,6 @@ func TestUseDriver(t *testing.T) {
 }
 
 func TestUseUserProvider(t *testing.T) {
-	t.Parallel()
 	userProvider := &MockUserProvider{user: &MockUser{ID: "fromUseUserProvider"}}
 	auth.UseUserProvider(userProvider)
 

@@ -60,10 +60,3 @@ type Handler[C, U, P any] interface {
 
 // AnyHandler is a convenience alias for a fully dynamic, untyped handler.
 type AnyHandler = Handler[any, any, any]
-
-type Provider interface {
-	LookupHandler(name string) (AnyHandler, error)
-
-	// MustHandler returns the AnyHandler for the given name or panics if not found.
-	MustHandler(name string) AnyHandler
-}

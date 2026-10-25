@@ -4,9 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
+
+	"github.com/gelozr/himo/hash"
 )
 
+// Errors returned by MemoryUserProvider.
 var (
 	ErrUserNotFound      = errors.New("user not found")
 	ErrUserAlreadyExists = errors.New("user already exists")
@@ -14,6 +18,7 @@ var (
 )
 
 // User represents a basic user record for MemoryUserProvider.
+// Password holds the plain password on registration and the hash once stored.
 type User struct {
 	ID       string
 	Email    string
@@ -26,8 +31,13 @@ type PasswordCredentials struct {
 	Password string
 }
 
+var dummyHash = sync.OnceValue(func() string {
+	h, _ := hash.Hash("dummy password")
+	return h
+})
+
 // MemoryUserProvider is an in-memory, demo/test only UserProvider.
-// It stores users keyed by email and implements FindByCredentials
+// It stores users keyed by lowercased email and implements FindByCredentials
 // to satisfy AnyHandler’s dynamic handler model.
 type MemoryUserProvider struct {
 	mu    sync.RWMutex
@@ -47,7 +57,7 @@ func NewMemoryUserProvider() *MemoryUserProvider {
 
 // FindByCredentials looks up a user by email/password.
 // Expects credentials of type PasswordCredentials, returns any to fit AnyHandler.
-func (p *MemoryUserProvider) FindByCredentials(ctx context.Context, credentials any) (any, error) {
+func (p *MemoryUserProvider) FindByCredentials(_ context.Context, credentials any) (any, error) {
 	creds, ok := credentials.(PasswordCredentials)
 	if !ok {
 		return nil, errors.New("invalid credentials type")
@@ -55,43 +65,58 @@ func (p *MemoryUserProvider) FindByCredentials(ctx context.Context, credentials 
 
 	u, err := p.GetByEmail(creds.Email)
 	if err != nil {
+		// Spend the same hashing time as a real check so response time doesn't reveal which emails exist.
+		_, _ = hash.Check(creds.Password, dummyHash())
 		return nil, fmt.Errorf("get user by email: %w", err)
 	}
 
-	if creds.Password != u.Password {
+	ok, err = hash.Check(creds.Password, u.Password)
+	if err != nil {
+		return nil, fmt.Errorf("check password: %w", err)
+	}
+	if !ok {
 		return nil, ErrIncorrectPassword
 	}
 
 	return u, nil
 }
 
-// GetByEmail returns the user with the given email or ErrUserNotFound.
+// GetByEmail returns a copy of the user with the given email or ErrUserNotFound.
 func (p *MemoryUserProvider) GetByEmail(email string) (*User, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	if u, ok := p.users[email]; ok {
-		return u, nil
+	if u, ok := p.users[strings.ToLower(email)]; ok {
+		cp := *u
+		return &cp, nil
 	}
 	return nil, ErrUserNotFound
 }
 
-// RegisterUser creates a new user with a generated ID and stores it in memory.
-// Expects user of type *User, returns any to satisfy AnyHandler.
-func (p *MemoryUserProvider) RegisterUser(ctx context.Context, user any) (any, error) {
+// RegisterUser stores a copy of the user with a generated ID and hashed password.
+// Expects user of type *User and returns the stored copy; the argument is not modified.
+func (p *MemoryUserProvider) RegisterUser(_ context.Context, user any) (any, error) {
 	u, ok := user.(*User)
 	if !ok {
 		return nil, errors.New("invalid user type")
 	}
 
+	hashed, err := hash.Hash(u.Password)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	stored := User{ID: uniqid(), Email: u.Email, Password: hashed}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if _, ok = p.users[u.Email]; ok {
+	key := strings.ToLower(u.Email)
+	if _, ok = p.users[key]; ok {
 		return nil, ErrUserAlreadyExists
 	}
 
-	u.ID = uniqid()
-	p.users[u.Email] = u
-	return u, nil
+	p.users[key] = &stored
+	cp := stored
+	return &cp, nil
 }

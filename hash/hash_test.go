@@ -506,3 +506,28 @@ func TestCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestManager_CheckDetectsMethodFromHash(t *testing.T) {
+	m := hash.New()
+	bcryptHash, err := m.Hash("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := m.SetDefault(hash.Argon2ID); err != nil {
+		t.Fatal(err)
+	}
+	argonHash, err := m.Hash("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for name, h := range map[string]string{"bcrypt": bcryptHash, "argon2id": argonHash} {
+		if ok, err := m.Check("secret", h); err != nil || !ok {
+			t.Errorf("%s hash with argon2id default: Check = %v, %v", name, ok, err)
+		}
+		if ok, err := m.Check("wrong", h); err != nil || ok {
+			t.Errorf("%s hash, wrong password: Check = %v, %v", name, ok, err)
+		}
+	}
+}

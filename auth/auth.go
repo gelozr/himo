@@ -1,7 +1,10 @@
+// Package auth authenticates users with pluggable user providers and drivers
+// (JWT or session), managed as named handlers.
 package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"sync"
@@ -50,7 +53,10 @@ func New(option ...HandlerOption) *Manager {
 	}
 
 	if o.Driver == nil {
-		o.Driver = NewJWTDriver()
+		// A random key per process: tokens don't survive restarts. Pass your own driver to persist them.
+		key := make([]byte, 32)
+		_, _ = rand.Read(key)
+		o.Driver = NewJWTDriver(key)
 	}
 	if o.UserProvider == nil {
 		o.UserProvider = NewMemoryUserProvider()
@@ -63,7 +69,7 @@ func New(option ...HandlerOption) *Manager {
 
 // RegisterUser delegates user registration to the default handler if supported.
 func (a *Manager) RegisterUser(ctx context.Context, user any) (any, error) {
-	if h, ok := a.MustHandler(a.defaultHandler).(UserRegisterer[any]); ok {
+	if h, ok := a.defaultH().(UserRegisterer[any]); ok {
 		return h.RegisterUser(ctx, user)
 	}
 
@@ -72,17 +78,17 @@ func (a *Manager) RegisterUser(ctx context.Context, user any) (any, error) {
 
 // Authenticate delegates credential-based authentication to the default handler.
 func (a *Manager) Authenticate(ctx context.Context, creds any) (any, error) {
-	return a.MustHandler(a.defaultHandler).Authenticate(ctx, creds)
+	return a.defaultH().Authenticate(ctx, creds)
 }
 
 // Validate delegates proof validation (e.g., token/session) to the default handler.
 func (a *Manager) Validate(ctx context.Context, proof any) (Verified[any], error) {
-	return a.MustHandler(a.defaultHandler).Validate(ctx, proof)
+	return a.defaultH().Validate(ctx, proof)
 }
 
 // Login delegates login to the default handler if supported.
 func (a *Manager) Login(ctx context.Context, user any) (string, error) {
-	if h, ok := a.MustHandler(a.defaultHandler).(LoginHandler[any]); ok {
+	if h, ok := a.defaultH().(LoginHandler[any]); ok {
 		return h.Login(ctx, user)
 	}
 
@@ -91,7 +97,7 @@ func (a *Manager) Login(ctx context.Context, user any) (string, error) {
 
 // Logout delegates logout to the default handler if supported.
 func (a *Manager) Logout(ctx context.Context, sessionID string) error {
-	if h, ok := a.MustHandler(a.defaultHandler).(LogoutHandler); ok {
+	if h, ok := a.defaultH().(LogoutHandler); ok {
 		return h.Logout(ctx, sessionID)
 	}
 
@@ -100,7 +106,7 @@ func (a *Manager) Logout(ctx context.Context, sessionID string) error {
 
 // IssueToken delegates token issuance to the default handler if supported.
 func (a *Manager) IssueToken(ctx context.Context, user any) (any, error) {
-	if h, ok := a.MustHandler(a.defaultHandler).(TokenIssuer[any, any]); ok {
+	if h, ok := a.defaultH().(TokenIssuer[any, any]); ok {
 		return h.IssueToken(ctx, user)
 	}
 	return nil, ErrIssueTokenNotSupported
@@ -108,7 +114,7 @@ func (a *Manager) IssueToken(ctx context.Context, user any) (any, error) {
 
 // RefreshToken delegates token refreshing to the default handler if supported.
 func (a *Manager) RefreshToken(ctx context.Context, refreshToken string) (any, error) {
-	if h, ok := a.MustHandler(a.defaultHandler).(TokenRefresher[any]); ok {
+	if h, ok := a.defaultH().(TokenRefresher[any]); ok {
 		return h.RefreshToken(ctx, refreshToken)
 	}
 	return nil, ErrRefreshTokenNotSupported
@@ -116,10 +122,21 @@ func (a *Manager) RefreshToken(ctx context.Context, refreshToken string) (any, e
 
 // RevokeToken delegates token revocation to the default handler if supported.
 func (a *Manager) RevokeToken(ctx context.Context, token string) error {
-	if h, ok := a.MustHandler(a.defaultHandler).(TokenRevoker); ok {
+	if h, ok := a.defaultH().(TokenRevoker); ok {
 		return h.RevokeToken(ctx, token)
 	}
 	return ErrRevokeTokenNotSupported
+}
+
+// defaultH returns the default handler, reading its name and the map under one lock.
+func (a *Manager) defaultH() AnyHandler {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	if h, ok := a.handlers[a.defaultHandler]; ok {
+		return h
+	}
+	panic(fmt.Sprintf("handler '%s' not found", a.defaultHandler))
 }
 
 // LookupHandler returns a named handler or ErrHandlerNotFound if it does not exist.
@@ -150,12 +167,12 @@ func (a *Manager) MustHandler(name string) AnyHandler {
 // The first handler registered becomes the default and will return an error
 // if the handler name already exists.
 func (a *Manager) RegisterHandler(name string, handler AnyHandler) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	if _, ok := a.handlers[name]; ok {
 		return fmt.Errorf("%w: %s", ErrHandlerAlreadyRegistered, name)
 	}
-
-	a.mu.Lock()
-	defer a.mu.Unlock()
 
 	// set the first handler as default
 	if len(a.handlers) == 0 {
@@ -181,10 +198,7 @@ func (a *Manager) Extend(name string, option HandlerOption) error {
 		a.defaultHandler = name
 	}
 
-	a.handlers[name] = &handler{
-		userProvider: option.UserProvider,
-		driver:       option.Driver,
-	}
+	a.handlers[name] = NewBaseAuth(option.UserProvider, option.Driver)
 
 	return nil
 }
@@ -302,8 +316,9 @@ func UseDriver(driver Validator[any, any]) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if h, ok := m.handlers[m.defaultHandler].(*handler); ok {
-		h.driver = driver
+	// Swap in a new handler instead of changing fields that in-flight requests read without a lock.
+	if h, ok := m.handlers[m.defaultHandler].(*BaseAuth[any, any, any]); ok {
+		m.handlers[m.defaultHandler] = NewBaseAuth(h.userProvider, driver)
 	}
 }
 
@@ -314,84 +329,7 @@ func UseUserProvider(provider UserProvider[any, any]) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if h, ok := m.handlers[m.defaultHandler].(*handler); ok {
-		h.userProvider = provider
+	if h, ok := m.handlers[m.defaultHandler].(*BaseAuth[any, any, any]); ok {
+		m.handlers[m.defaultHandler] = NewBaseAuth(provider, h.driver)
 	}
-}
-
-// handler is the untyped implementation of AnyHandler that Manager uses
-// to delegate Authenticate, Validate, and other optional methods.
-type handler struct {
-	driver       Validator[any, any]
-	userProvider UserProvider[any, any]
-}
-
-var (
-	_ AnyHandler            = (*handler)(nil)
-	_ UserRegisterer[any]   = (*handler)(nil)
-	_ LoginHandler[any]     = (*handler)(nil)
-	_ LogoutHandler         = (*handler)(nil)
-	_ TokenIssuer[any, any] = (*handler)(nil)
-	_ TokenRefresher[any]   = (*handler)(nil)
-	_ TokenRevoker          = (*handler)(nil)
-)
-
-func (h *handler) RegisterUser(ctx context.Context, user any) (any, error) {
-	if d, ok := h.userProvider.(UserRegisterer[any]); ok {
-		return d.RegisterUser(ctx, user)
-	}
-	return nil, ErrRegisterUserNotSupported
-}
-
-func (h *handler) Authenticate(ctx context.Context, creds any) (any, error) {
-	user, err := h.userProvider.FindByCredentials(ctx, creds)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
-}
-
-func (h *handler) Validate(ctx context.Context, proof any) (Verified[any], error) {
-	verified, err := h.driver.Validate(ctx, proof)
-	if err != nil {
-		return Verified[any]{}, err
-	}
-
-	return verified, nil
-}
-
-func (h *handler) Login(ctx context.Context, user any) (string, error) {
-	if d, ok := h.driver.(LoginHandler[any]); ok {
-		return d.Login(ctx, user)
-	}
-	return "", ErrLoginNotSupported
-}
-
-func (h *handler) Logout(ctx context.Context, sessionID string) error {
-	if d, ok := h.driver.(LogoutHandler); ok {
-		return d.Logout(ctx, sessionID)
-	}
-	return ErrLogoutNotSupported
-}
-
-func (h *handler) IssueToken(ctx context.Context, user any) (any, error) {
-	if d, ok := h.driver.(TokenIssuer[any, any]); ok {
-		return d.IssueToken(ctx, user)
-	}
-	return nil, ErrIssueTokenNotSupported
-}
-
-func (h *handler) RefreshToken(ctx context.Context, refreshToken string) (any, error) {
-	if d, ok := h.driver.(TokenRefresher[any]); ok {
-		return d.RefreshToken(ctx, refreshToken)
-	}
-	return nil, ErrRefreshTokenNotSupported
-}
-
-func (h *handler) RevokeToken(ctx context.Context, token string) error {
-	if d, ok := h.driver.(TokenRevoker); ok {
-		return d.RevokeToken(ctx, token)
-	}
-	return ErrRevokeTokenNotSupported
 }
