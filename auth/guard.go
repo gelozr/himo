@@ -43,6 +43,7 @@ type TokenGuard[C, ID, T any] struct {
 	tokens TokenProvider[ID, T]
 }
 
+// NewTokenGuard creates a TokenGuard. It panics if users or tokens is nil.
 func NewTokenGuard[C, ID, T any](users UserProvider[C, ID], tokens TokenProvider[ID, T]) *TokenGuard[C, ID, T] {
 	if users == nil || tokens == nil {
 		panic("auth: TokenGuard needs a UserProvider and a TokenProvider")
@@ -60,10 +61,12 @@ func (g *TokenGuard[C, ID, T]) Login(ctx context.Context, creds C) (T, error) {
 	return g.tokens.Issue(ctx, id)
 }
 
+// Refresh exchanges a refresh token for new tokens.
 func (g *TokenGuard[C, ID, T]) Refresh(ctx context.Context, refreshToken string) (T, error) {
 	return g.tokens.Refresh(ctx, refreshToken)
 }
 
+// Verify returns the user identity carried by a bearer token.
 func (g *TokenGuard[C, ID, T]) Verify(ctx context.Context, bearer string) (ID, error) {
 	return g.tokens.Verify(ctx, bearer)
 }
@@ -75,10 +78,12 @@ type JWTTokens struct {
 
 var _ TokenProvider[string, string] = (*JWTTokens)(nil)
 
+// NewJWTTokens creates a JWTTokens that issues and verifies tokens with d.
 func NewJWTTokens(d *JWTDriver) *JWTTokens {
 	return &JWTTokens{d: d}
 }
 
+// Issue returns a new JWT for userID.
 func (t *JWTTokens) Issue(ctx context.Context, userID string) (string, error) {
 	tok, err := t.d.IssueToken(ctx, &User{ID: userID})
 	if err != nil {
@@ -87,6 +92,7 @@ func (t *JWTTokens) Issue(ctx context.Context, userID string) (string, error) {
 	return tok.(string), nil
 }
 
+// Refresh exchanges a valid token for a new one and revokes the old one.
 func (t *JWTTokens) Refresh(ctx context.Context, refreshToken string) (string, error) {
 	tok, err := t.d.RefreshToken(ctx, refreshToken)
 	if err != nil {
@@ -99,6 +105,7 @@ func (t *JWTTokens) Refresh(ctx context.Context, refreshToken string) (string, e
 	return tok.(string), nil
 }
 
+// Verify returns the user ID of a valid, unrevoked JWT.
 func (t *JWTTokens) Verify(ctx context.Context, bearer string) (string, error) {
 	v, err := t.d.Validate(ctx, bearer)
 	if err != nil {
