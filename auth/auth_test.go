@@ -979,52 +979,6 @@ func Test_RevokeToken(t *testing.T) {
 	})
 }
 
-func TestUseDriver(t *testing.T) {
-	driver := &MockDriver{user: &MockUser{ID: "fromUseDriver"}}
-	auth.UseDriver(driver)
-
-	v, err := auth.Validate(context.Background(), "token")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !driver.validateCalled {
-		t.Errorf("MockDriver.Validate() expected to be called")
-	}
-
-	u, ok := v.User.(*MockUser)
-	if !ok {
-		t.Fatalf("Validate() expected User to be of type *MockUser")
-	}
-
-	if u.ID != "fromUseDriver" {
-		t.Errorf("Validate() user ID does not match")
-	}
-}
-
-func TestUseUserProvider(t *testing.T) {
-	userProvider := &MockUserProvider{user: &MockUser{ID: "fromUseUserProvider"}}
-	auth.UseUserProvider(userProvider)
-
-	u, err := auth.Authenticate(context.Background(), "creds")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !userProvider.findByCredentialsCalled {
-		t.Errorf("MockUserProvider.FindByCredentials() expected to be called")
-	}
-
-	user, ok := u.(*MockUser)
-	if !ok {
-		t.Fatalf("Authenticate() expected User to be of type *MockUser")
-	}
-
-	if user.ID != "fromUseUserProvider" {
-		t.Errorf("Authenticate() user ID does not match")
-	}
-}
-
 func TestUnsupportedMethods(t *testing.T) {
 	t.Parallel()
 	a := auth.New()

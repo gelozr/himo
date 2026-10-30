@@ -212,8 +212,8 @@ func TestManager(t *testing.T) {
 	if err := m.RegisterDriver("fake", fake); err == nil {
 		t.Error("expected duplicate driver error")
 	}
-	if err := m.SetDefaultDriver("missing"); err == nil {
-		t.Error("expected missing driver error")
+	if err := m.SetDefaultDriver("missing"); !errors.Is(err, ErrMailerNotFound) {
+		t.Errorf("SetDefaultDriver(missing) = %v, want ErrMailerNotFound", err)
 	}
 	if err := m.SetDefaultDriver("fake"); err != nil {
 		t.Fatal(err)

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/alexedwards/argon2id"
+	"github.com/gelozr/himo/internal/registry"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -33,97 +34,59 @@ type Hasher interface {
 
 // Manager is a thread-safe registry of hashers with a default Method.
 type Manager struct {
-	mu            sync.RWMutex
-	hashers       map[Method]Hasher
-	defaultHasher Method
+	hashers *registry.Registry[Method, Hasher]
 }
 
-// New returns a Manager pre-configured with Bcrypt and Argon2ID hashers.
+// New returns a Manager with Bcrypt (the default) and Argon2ID hashers.
 func New() *Manager {
-	m := &Manager{
-		hashers:       make(map[Method]Hasher),
-		defaultHasher: Bcrypt,
-	}
-
-	m.hashers[Bcrypt] = BcryptHasher{}
-	m.hashers[Argon2ID] = Argon2IDHasher{}
-
+	m := &Manager{hashers: registry.New[Method, Hasher](ErrHasherNotFound)}
+	m.hashers.Set(Bcrypt, BcryptHasher{})
+	m.hashers.Set(Argon2ID, Argon2IDHasher{})
 	return m
 }
 
 // Hash generates a password hash using the default Method.
 func (m *Manager) Hash(password string) (string, error) {
-	return m.MustHasher(m.defaultMethod()).Hash(password)
+	return m.hashers.Default().Hash(password)
 }
 
 // Check verifies a password against a hash. Bcrypt and argon2id hashes are
 // recognised by their prefix, so changing the default Method doesn't break
 // hashes that are already stored. Any other hash is checked with the default Method.
 func (m *Manager) Check(password, hash string) (bool, error) {
-	return m.MustHasher(m.methodFor(hash)).Check(password, hash)
+	return m.hasherFor(hash).Check(password, hash)
 }
 
-func (m *Manager) methodFor(hash string) Method {
+func (m *Manager) hasherFor(hash string) Hasher {
 	switch {
 	case strings.HasPrefix(hash, "$argon2id$"):
-		return Argon2ID
+		return m.hashers.MustGet(Argon2ID)
 	case strings.HasPrefix(hash, "$2a$"), strings.HasPrefix(hash, "$2b$"), strings.HasPrefix(hash, "$2y$"):
-		return Bcrypt
+		return m.hashers.MustGet(Bcrypt)
 	}
-	return m.defaultMethod()
-}
-
-func (m *Manager) defaultMethod() Method {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.defaultHasher
+	return m.hashers.Default()
 }
 
 // Hasher looks up a Hasher by Method. Returns ErrHasherNotFound if missing.
 func (m *Manager) Hasher(mt Method) (Hasher, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if hasher, ok := m.hashers[mt]; ok {
-		return hasher, nil
-	}
-
-	return nil, fmt.Errorf("%w: %s", ErrHasherNotFound, mt)
+	return m.hashers.Get(mt)
 }
 
 // MustHasher returns a Hasher for the Method or panics if not registered.
 func (m *Manager) MustHasher(mt Method) Hasher {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if hasher, ok := m.hashers[mt]; ok {
-		return hasher
-	}
-
-	panic(fmt.Sprintf("hasher '%s' not found", mt))
+	return m.hashers.MustGet(mt)
 }
 
 // Extend registers a new Hasher under the given Method, overwriting if existing.
 func (m *Manager) Extend(mt Method, hasher Hasher) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.hashers[mt] = hasher
+	m.hashers.Set(mt, hasher)
 	return nil
 }
 
 // SetDefault changes the default Method used by Hash and Check.
 // Returns ErrHasherNotFound if the Method is not registered.
 func (m *Manager) SetDefault(mt Method) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if _, ok := m.hashers[mt]; !ok {
-		return fmt.Errorf("%w: %s", ErrHasherNotFound, mt)
-	}
-
-	m.defaultHasher = mt
-	return nil
+	return m.hashers.SetDefault(mt)
 }
 
 var (

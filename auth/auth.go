@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/gelozr/himo/internal/registry"
 )
 
 // Common errors returned by Manager when operations are unsupported
@@ -24,9 +26,7 @@ var (
 
 // Manager orchestrates one or more named authentication handlers.
 type Manager struct {
-	mu             sync.RWMutex
-	handlers       map[string]AnyHandler
-	defaultHandler string
+	handlers *registry.Registry[string, AnyHandler]
 }
 
 var (
@@ -42,10 +42,7 @@ var (
 // New creates a Manager and registers a "default" handler.
 // Optionally accepts a HandlerOption to override the default driver or user provider.
 func New(option ...HandlerOption) *Manager {
-	m := &Manager{
-		handlers:       make(map[string]AnyHandler),
-		defaultHandler: "",
-	}
+	m := &Manager{handlers: registry.New[string, AnyHandler](ErrHandlerNotFound)}
 
 	var o HandlerOption
 	if len(option) > 0 {
@@ -69,7 +66,7 @@ func New(option ...HandlerOption) *Manager {
 
 // RegisterUser delegates user registration to the default handler if supported.
 func (a *Manager) RegisterUser(ctx context.Context, user any) (any, error) {
-	if h, ok := a.defaultH().(UserRegisterer[any]); ok {
+	if h, ok := a.handlers.Default().(UserRegisterer[any]); ok {
 		return h.RegisterUser(ctx, user)
 	}
 
@@ -78,17 +75,17 @@ func (a *Manager) RegisterUser(ctx context.Context, user any) (any, error) {
 
 // Authenticate delegates credential-based authentication to the default handler.
 func (a *Manager) Authenticate(ctx context.Context, creds any) (any, error) {
-	return a.defaultH().Authenticate(ctx, creds)
+	return a.handlers.Default().Authenticate(ctx, creds)
 }
 
 // Validate delegates proof validation (e.g., token/session) to the default handler.
 func (a *Manager) Validate(ctx context.Context, proof any) (Verified[any], error) {
-	return a.defaultH().Validate(ctx, proof)
+	return a.handlers.Default().Validate(ctx, proof)
 }
 
 // Login delegates login to the default handler if supported.
 func (a *Manager) Login(ctx context.Context, user any) (string, error) {
-	if h, ok := a.defaultH().(LoginHandler[any]); ok {
+	if h, ok := a.handlers.Default().(LoginHandler[any]); ok {
 		return h.Login(ctx, user)
 	}
 
@@ -97,7 +94,7 @@ func (a *Manager) Login(ctx context.Context, user any) (string, error) {
 
 // Logout delegates logout to the default handler if supported.
 func (a *Manager) Logout(ctx context.Context, sessionID string) error {
-	if h, ok := a.defaultH().(LogoutHandler); ok {
+	if h, ok := a.handlers.Default().(LogoutHandler); ok {
 		return h.Logout(ctx, sessionID)
 	}
 
@@ -106,7 +103,7 @@ func (a *Manager) Logout(ctx context.Context, sessionID string) error {
 
 // IssueToken delegates token issuance to the default handler if supported.
 func (a *Manager) IssueToken(ctx context.Context, user any) (any, error) {
-	if h, ok := a.defaultH().(TokenIssuer[any, any]); ok {
+	if h, ok := a.handlers.Default().(TokenIssuer[any, any]); ok {
 		return h.IssueToken(ctx, user)
 	}
 	return nil, ErrIssueTokenNotSupported
@@ -114,7 +111,7 @@ func (a *Manager) IssueToken(ctx context.Context, user any) (any, error) {
 
 // RefreshToken delegates token refreshing to the default handler if supported.
 func (a *Manager) RefreshToken(ctx context.Context, refreshToken string) (any, error) {
-	if h, ok := a.defaultH().(TokenRefresher[any]); ok {
+	if h, ok := a.handlers.Default().(TokenRefresher[any]); ok {
 		return h.RefreshToken(ctx, refreshToken)
 	}
 	return nil, ErrRefreshTokenNotSupported
@@ -122,64 +119,29 @@ func (a *Manager) RefreshToken(ctx context.Context, refreshToken string) (any, e
 
 // RevokeToken delegates token revocation to the default handler if supported.
 func (a *Manager) RevokeToken(ctx context.Context, token string) error {
-	if h, ok := a.defaultH().(TokenRevoker); ok {
+	if h, ok := a.handlers.Default().(TokenRevoker); ok {
 		return h.RevokeToken(ctx, token)
 	}
 	return ErrRevokeTokenNotSupported
 }
 
-// defaultH returns the default handler, reading its name and the map under one lock.
-func (a *Manager) defaultH() AnyHandler {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	if h, ok := a.handlers[a.defaultHandler]; ok {
-		return h
-	}
-	panic(fmt.Sprintf("handler '%s' not found", a.defaultHandler))
-}
-
 // LookupHandler returns a named handler or ErrHandlerNotFound if it does not exist.
 func (a *Manager) LookupHandler(name string) (AnyHandler, error) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	if g, ok := a.handlers[name]; ok {
-		return g, nil
-	}
-	return nil, fmt.Errorf("%w: %s", ErrHandlerNotFound, name)
+	return a.handlers.Get(name)
 }
 
 // MustHandler returns a named handler, panicking if it does not exist.
 // Useful for startup code where handlers are expected to be present.
 func (a *Manager) MustHandler(name string) AnyHandler {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	if g, ok := a.handlers[name]; ok {
-		return g
-	}
-
-	panic(fmt.Sprintf("handler '%s' not found", name))
+	return a.handlers.MustGet(name)
 }
 
-// RegisterHandler registers a new handler under the given name.
-// The first handler registered becomes the default and will return an error
-// if the handler name already exists.
+// RegisterHandler registers a new handler under the given name, or returns
+// ErrHandlerAlreadyRegistered if the name is taken. The first handler registered becomes the default.
 func (a *Manager) RegisterHandler(name string, handler AnyHandler) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if _, ok := a.handlers[name]; ok {
+	if !a.handlers.Add(name, handler) {
 		return fmt.Errorf("%w: %s", ErrHandlerAlreadyRegistered, name)
 	}
-
-	// set the first handler as default
-	if len(a.handlers) == 0 {
-		a.defaultHandler = name
-	}
-
-	a.handlers[name] = handler
 	return nil
 }
 
@@ -190,30 +152,13 @@ func (a *Manager) Extend(name string, option HandlerOption) error {
 		panic("UserProvider or Validator cannot be nil")
 	}
 
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	// set the first handler as default
-	if len(a.handlers) == 0 {
-		a.defaultHandler = name
-	}
-
-	a.handlers[name] = NewBaseAuth(option.UserProvider, option.Driver)
-
+	a.handlers.Set(name, NewBaseAuth(option.UserProvider, option.Driver))
 	return nil
 }
 
 // SetDefault sets the default handler to the named handler, returning an error if not found.
 func (a *Manager) SetDefault(name string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if _, ok := a.handlers[name]; !ok {
-		return fmt.Errorf("%w: %s", ErrHandlerNotFound, name)
-	}
-
-	a.defaultHandler = name
-	return nil
+	return a.handlers.SetDefault(name)
 }
 
 // Verified holds the result of a successful proof validation,
@@ -307,29 +252,4 @@ func Extend(name string, option HandlerOption) error {
 // SetDefault sets the default handler on the default Manager.
 func SetDefault(name string) error {
 	return getManager().SetDefault(name)
-}
-
-// UseDriver replaces the Validator on the default handler (preserving user provider).
-func UseDriver(driver Validator[any, any]) {
-	m := getManager()
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Swap in a new handler instead of changing fields that in-flight requests read without a lock.
-	if h, ok := m.handlers[m.defaultHandler].(*BaseAuth[any, any, any]); ok {
-		m.handlers[m.defaultHandler] = NewBaseAuth(h.userProvider, driver)
-	}
-}
-
-// UseUserProvider replaces the UserProvider on the default handler (preserving driver).
-func UseUserProvider(provider UserProvider[any, any]) {
-	m := getManager()
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if h, ok := m.handlers[m.defaultHandler].(*BaseAuth[any, any, any]); ok {
-		m.handlers[m.defaultHandler] = NewBaseAuth(provider, h.driver)
-	}
 }

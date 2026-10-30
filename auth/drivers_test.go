@@ -141,7 +141,7 @@ func TestMemoryUserProvider_EmailIsCaseInsensitive(t *testing.T) {
 	}
 }
 
-// Run with -race: SetDefault and UseDriver-style swaps must not race with requests.
+// Run with -race: SetDefault must not race with requests.
 func TestManager_ConcurrentSetDefaultAndValidate(t *testing.T) {
 	m := New()
 	if err := m.Extend("other", HandlerOption{Driver: NewJWTDriver([]byte("k")), UserProvider: NewMemoryUserProvider()}); err != nil {

@@ -3,8 +3,10 @@ package mail
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"sync"
+
+	"github.com/gelozr/himo/internal/registry"
 )
 
 // Driver names a registered Mailer.
@@ -37,7 +39,6 @@ type Message struct {
 
 // Config configures NewManager and the SMTP mailer.
 type Config struct {
-	MailDriver        string
 	MailHost          string
 	MailPort          int
 	MailUser          string
@@ -45,76 +46,43 @@ type Config struct {
 	MailSkipTLSVerify bool
 }
 
+// ErrMailerNotFound is returned when no Mailer is registered for a Driver.
+var ErrMailerNotFound = errors.New("mailer not found")
+
 // Manager routes messages to named mailers. It is safe for concurrent use.
 type Manager struct {
-	mu            sync.RWMutex
-	mailers       map[Driver]Mailer
-	defaultDriver Driver
+	mailers *registry.Registry[Driver, Mailer]
 }
 
 var _ Mailer = (*Manager)(nil)
 
-// NewManager creates a Manager with the SMTP mailer registered. The default
-// driver is cfg.MailDriver, or SMTP when empty.
+// NewManager creates a Manager with the SMTP mailer registered as the default.
+// Use RegisterDriver and SetDefaultDriver to send through another Mailer.
 func NewManager(cfg Config) *Manager {
-	defaultDriver := SMTP
-	if cfg.MailDriver != "" {
-		defaultDriver = Driver(cfg.MailDriver)
-	}
-
-	return &Manager{
-		mailers:       map[Driver]Mailer{SMTP: NewSMTPMailer(cfg)},
-		defaultDriver: defaultDriver,
-	}
+	m := &Manager{mailers: registry.New[Driver, Mailer](ErrMailerNotFound)}
+	m.mailers.Set(SMTP, NewSMTPMailer(cfg))
+	return m
 }
 
 // Mailer returns the mailer registered under driver.
 func (m *Manager) Mailer(driver Driver) (Mailer, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if ml, ok := m.mailers[driver]; ok {
-		return ml, nil
-	}
-	return nil, fmt.Errorf("mailer %q not found", driver)
+	return m.mailers.Get(driver)
 }
 
 // Send sends the message with the default driver's mailer.
 func (m *Manager) Send(ctx context.Context, msg *Message) error {
-	m.mu.RLock()
-	driver := m.defaultDriver
-	m.mu.RUnlock()
-
-	mailer, err := m.Mailer(driver)
-	if err != nil {
-		return err
-	}
-
-	return mailer.Send(ctx, msg)
+	return m.mailers.Default().Send(ctx, msg)
 }
 
 // RegisterDriver adds a mailer under a new driver name.
 func (m *Manager) RegisterDriver(driver Driver, mailer Mailer) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if _, ok := m.mailers[driver]; ok {
+	if !m.mailers.Add(driver, mailer) {
 		return fmt.Errorf("driver %q already exists", driver)
 	}
-
-	m.mailers[driver] = mailer
 	return nil
 }
 
 // SetDefaultDriver makes Send use the mailer registered under driver.
 func (m *Manager) SetDefaultDriver(driver Driver) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if _, ok := m.mailers[driver]; !ok {
-		return fmt.Errorf("driver %q not found", driver)
-	}
-
-	m.defaultDriver = driver
-	return nil
+	return m.mailers.SetDefault(driver)
 }
