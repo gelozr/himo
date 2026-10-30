@@ -12,9 +12,9 @@ import (
 
 // Errors returned by MemoryUserProvider.
 var (
-	ErrUserNotFound      = errors.New("user not found")
-	ErrUserAlreadyExists = errors.New("user already exists")
-	ErrIncorrectPassword = errors.New("incorrect password")
+	ErrUserNotFound      error = &kindError{"user not found", ErrInvalidCredentials}
+	ErrUserAlreadyExists       = errors.New("user already exists")
+	ErrIncorrectPassword error = &kindError{"incorrect password", ErrInvalidCredentials}
 )
 
 // User represents a basic user record for MemoryUserProvider.

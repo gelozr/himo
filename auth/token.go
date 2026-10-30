@@ -12,9 +12,9 @@ import (
 
 // Errors returned by JWTDriver.
 var (
-	ErrJWTExpired = errors.New("JWT is expired")
-	ErrJWTInvalid = errors.New("JWT is invalid")
-	ErrJWTRevoked = errors.New("JWT is revoked")
+	ErrJWTExpired error = &kindError{"JWT is expired", ErrTokenExpired}
+	ErrJWTInvalid error = &kindError{"JWT is invalid", ErrInvalidToken}
+	ErrJWTRevoked error = &kindError{"JWT is revoked", ErrInvalidToken}
 )
 
 // TokenDriver defines the contract for token-based authentication drivers.
