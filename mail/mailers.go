@@ -240,10 +240,10 @@ func buildBody(m *Message) ([]byte, string, error) {
 }
 
 // reservedHeaders are written by buildMessage; duplicates would break or contradict the message.
-// Bcc is included because it would be shown to every recipient and never delivered.
+// Cc and Bcc are included because the mailer only delivers to To, so those addresses would never get the mail.
 var reservedHeaders = map[string]bool{
 	"Mime-Version": true, "Date": true, "Message-Id": true, "Subject": true,
-	"From": true, "To": true, "Content-Type": true, "Bcc": true,
+	"From": true, "To": true, "Content-Type": true, "Cc": true, "Bcc": true,
 }
 
 func checkAddress(a Address) error {
