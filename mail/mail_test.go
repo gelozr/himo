@@ -123,6 +123,7 @@ func TestBuildMessage_RejectsHeaderInjection(t *testing.T) {
 		"no body": func(m *Message) { m.Text, m.HTML = "", "" },
 		"dup":     func(m *Message) { m.Headers["content-type"] = "text/plain" },
 		"bcc":     func(m *Message) { m.Headers["Bcc"] = "victim@example.com" },
+		"cc":      func(m *Message) { m.Headers["cc"] = "other@example.com" },
 		"empty k": func(m *Message) { m.Headers[""] = "v" },
 		"space k": func(m *Message) { m.Headers["X Foo"] = "v" },
 		"long":    func(m *Message) { m.Subject = strings.Repeat("a", 1000) },
