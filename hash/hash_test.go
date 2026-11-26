@@ -234,6 +234,13 @@ func TestManager_SetDefault(t *testing.T) {
 	}
 }
 
+func TestManager_ZeroValueExtend(t *testing.T) {
+	var manager hash.Manager
+	if err := manager.Extend(hash.Bcrypt, hash.BcryptHasher{}); err == nil {
+		t.Fatal("Extend() succeeded on an uninitialized manager")
+	}
+}
+
 func TestManager_ExtendRejectsNilHasher(t *testing.T) {
 	manager := hash.New()
 	if err := manager.Extend(hash.Bcrypt, nil); err == nil {
