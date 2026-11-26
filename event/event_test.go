@@ -12,6 +12,14 @@ type userCreated struct{ ID string }
 
 type namer interface{ Name() string }
 
+func TestBroker_ZeroValue(t *testing.T) {
+	var broker Broker
+	broker.RegisterBus(NewBus[userCreated]())
+	if err := broker.Publish(t.Context(), userCreated{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestBroker_RoutesByType(t *testing.T) {
 	ctx := context.Background()
 	b := NewBroker()

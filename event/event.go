@@ -15,6 +15,7 @@ type Publisher interface {
 }
 
 // Broker routes each event to the bus registered for its concrete type.
+// Its zero value is an empty Broker ready for use.
 // Buses for interface types never match, since events are routed by their dynamic type.
 type Broker struct {
 	mu    sync.RWMutex
@@ -23,9 +24,7 @@ type Broker struct {
 
 // NewBroker creates an empty Broker.
 func NewBroker() *Broker {
-	return &Broker{
-		buses: make(map[reflect.Type]Publisher),
-	}
+	return &Broker{}
 }
 
 // RegisterBus routes events of bus.Type() to bus, replacing any bus already registered for it.
@@ -35,6 +34,9 @@ func (r *Broker) RegisterBus(bus Publisher) {
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.buses == nil {
+		r.buses = make(map[reflect.Type]Publisher)
+	}
 	r.buses[t] = bus
 }
 
