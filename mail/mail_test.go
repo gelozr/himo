@@ -232,6 +232,31 @@ func TestSMTPMailer_SendQuotedMailboxes(t *testing.T) {
 	}
 }
 
+func TestSMTPMailer_SendIPv6AddressLiterals(t *testing.T) {
+	mailer, got := fakeSMTP(t, false)
+	m := testMessage()
+	m.From = Address{Address: `"sender@desk"@[IPv6:2001:db8::1]`}
+	m.To = []Address{{Address: "recipient@[ipv6:::ffff:192.0.2.1]"}}
+
+	if err := mailer.Send(t.Context(), m); err != nil {
+		t.Fatal(err)
+	}
+	msg := <-got
+	want := "MAIL FROM:<" + m.From.Address + ">\nRCPT TO:<" + m.To[0].Address + ">"
+	if envelope := strings.Join(msg.envelope, "\n"); envelope != want {
+		t.Errorf("envelope = %q, want %q", envelope, want)
+	}
+	parsed, err := mail.ReadMessage(strings.NewReader(msg.data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for header, address := range map[string]string{"From": m.From.Address, "To": m.To[0].Address} {
+		if value := parsed.Header.Get(header); value != "<"+address+">" {
+			t.Errorf("%s = %q, want <%s>", header, value, address)
+		}
+	}
+}
+
 func TestBuildMessage_RejectsNonBareMailboxes(t *testing.T) {
 	for _, address := range []string{
 		`Sender <sender@example.com>`,
@@ -244,6 +269,10 @@ func TestBuildMessage_RejectsNonBareMailboxes(t *testing.T) {
 		"\"bad\tspace\"@example.com",
 		"\"bad\\\tspace\"@example.com",
 		"\"bad\r\nspace\"@example.com",
+		`sender@[IPv6:192.0.2.1]`,
+		`sender@[IPv6:2001:db8::xyz]`,
+		`sender@[IPv6:fe80::1%eth0]`,
+		`<sender@[IPv6:2001:db8::1]>`,
 	} {
 		m := testMessage()
 		m.From.Address = address

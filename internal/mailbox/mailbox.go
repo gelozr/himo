@@ -25,6 +25,15 @@ func Valid(address string) bool {
 		// Go's parser unquotes the local part and rejects an empty one.
 		address = "x@" + address[span[1]:]
 	}
+	// Go's parser accepts IP literals without the SMTP IPv6 tag.
+	if local, domain, ok := strings.Cut(address, "@["); ok {
+		if tag, ip, ok := strings.Cut(domain, ":"); ok && strings.EqualFold(tag, "IPv6") {
+			if !strings.Contains(ip, ":") {
+				return false
+			}
+			address = local + "@[" + ip
+		}
+	}
 	parsed, err := mail.ParseAddress(address)
 	return err == nil && parsed.Address == address
 }
