@@ -97,7 +97,7 @@ func (p *MemoryUserProvider) GetByEmail(email string) (*User, error) {
 // Expects user of type *User and returns the stored copy; the argument is not modified.
 func (p *MemoryUserProvider) RegisterUser(_ context.Context, user any) (any, error) {
 	u, ok := user.(*User)
-	if !ok {
+	if !ok || u == nil {
 		return nil, errors.New("invalid user type")
 	}
 
