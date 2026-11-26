@@ -78,7 +78,7 @@ func (m *MemorySessionDriver) Validate(_ context.Context, proof any) (Verified[a
 // Login generates a new session ID for the given user and stores it in memory.
 func (m *MemorySessionDriver) Login(_ context.Context, user any) (string, error) {
 	usr, ok := user.(*User)
-	if !ok || usr.ID == "" {
+	if !ok || usr == nil || usr.ID == "" {
 		return "", ErrInvalidUser
 	}
 

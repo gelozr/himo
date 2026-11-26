@@ -59,6 +59,15 @@ func TestJWTDriver_RejectsForeignTokens(t *testing.T) {
 	}
 }
 
+func TestMemorySessionDriver_RejectsNilUser(t *testing.T) {
+	d := NewMemorySessionDriver()
+	var user *User
+
+	if id, err := d.Login(context.Background(), user); id != "" || !errors.Is(err, ErrInvalidUser) {
+		t.Errorf("Login = %q, %v; want empty session ID and ErrInvalidUser", id, err)
+	}
+}
+
 func TestMemorySessionDriver_RemovesExpiredSessions(t *testing.T) {
 	ctx := context.Background()
 	d := NewMemorySessionDriver()
