@@ -27,7 +27,8 @@ type Address struct {
 }
 
 // Message is an email with a plain text and/or HTML body.
-// Headers adds extra headers; the ones the mailer sets itself (From, To, Subject, ...) are rejected.
+// Headers adds extra headers. The mailer reserves headers such as From, To,
+// Subject, and Content-Transfer-Encoding.
 type Message struct {
 	From    Address
 	To      []Address

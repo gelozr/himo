@@ -205,7 +205,7 @@ func validateMessage(m *Message) error {
 			return fmt.Errorf("invalid header %q", k)
 		}
 		if reservedHeaders[textproto.CanonicalMIMEHeaderKey(k)] {
-			return fmt.Errorf("header %q is set by the mailer", k)
+			return fmt.Errorf("header %q is reserved by the mailer", k)
 		}
 	}
 	return nil
@@ -242,11 +242,12 @@ func buildBody(m *Message) ([]byte, string, error) {
 	return body.Bytes(), mw.Boundary(), nil
 }
 
-// reservedHeaders are written by buildMessage; duplicates would break or contradict the message.
+// These headers can conflict with the generated message or its SMTP recipients.
 // Cc and Bcc are included because the mailer only delivers to To, so those addresses would never get the mail.
 var reservedHeaders = map[string]bool{
 	"Mime-Version": true, "Date": true, "Message-Id": true, "Subject": true,
 	"From": true, "To": true, "Content-Type": true, "Cc": true, "Bcc": true,
+	"Content-Transfer-Encoding": true, // The multipart body uses the default 7bit encoding.
 }
 
 func checkAddress(a Address) error {

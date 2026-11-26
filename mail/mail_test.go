@@ -113,7 +113,7 @@ func TestBuildMessage_FoldsLongDisplayNames(t *testing.T) {
 	}
 }
 
-func TestBuildMessage_RejectsHeaderInjection(t *testing.T) {
+func TestBuildMessage_RejectsInvalidMessages(t *testing.T) {
 	for name, edit := range map[string]func(*Message){
 		"subject": func(m *Message) { m.Subject = "hi\r\nBcc: victim@example.com" },
 		"to":      func(m *Message) { m.To[0].Address = "to@example.com\r\nBcc: victim@example.com" },
@@ -124,6 +124,7 @@ func TestBuildMessage_RejectsHeaderInjection(t *testing.T) {
 		"dup":     func(m *Message) { m.Headers["content-type"] = "text/plain" },
 		"bcc":     func(m *Message) { m.Headers["Bcc"] = "victim@example.com" },
 		"cc":      func(m *Message) { m.Headers["cc"] = "other@example.com" },
+		"base64":  func(m *Message) { m.Headers["content-transfer-encoding"] = "base64" },
 		"empty k": func(m *Message) { m.Headers[""] = "v" },
 		"space k": func(m *Message) { m.Headers["X Foo"] = "v" },
 		"long":    func(m *Message) { m.Subject = strings.Repeat("a", 1000) },
