@@ -136,9 +136,12 @@ func (a *Manager) MustHandler(name string) AnyHandler {
 	return a.handlers.MustGet(name)
 }
 
-// RegisterHandler registers a new handler under the given name, or returns
+// RegisterHandler registers a non-nil handler under the given name, or returns
 // ErrHandlerAlreadyRegistered if the name is taken. The first handler registered becomes the default.
 func (a *Manager) RegisterHandler(name string, handler AnyHandler) error {
+	if handler == nil {
+		return fmt.Errorf("handler for %q is nil", name)
+	}
 	if !a.handlers.Add(name, handler) {
 		return fmt.Errorf("%w: %s", ErrHandlerAlreadyRegistered, name)
 	}
