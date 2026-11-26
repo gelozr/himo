@@ -47,7 +47,9 @@ func TestRoutes_RegisterLoginMeLogout(t *testing.T) {
 	}
 
 	account := `{"email":"a@example.com","password":"correct horse"}`
-	do("POST", "/register", "", account, http.StatusCreated)
+	do("POST", "/register", "", account+" {}", http.StatusBadRequest)
+	do("POST", "/register", "", account+" invalid", http.StatusBadRequest)
+	do("POST", "/register", "", account+" \n", http.StatusCreated)
 	do("POST", "/register", "", account, http.StatusConflict)
 	do("POST", "/register", "", `{"email":"b@example.com","password":"short"}`, http.StatusBadRequest)
 	do("POST", "/login", "", `{"email":"a@example.com","password":"wrong password"}`, http.StatusUnauthorized)
