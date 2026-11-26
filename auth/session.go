@@ -34,6 +34,7 @@ type session struct {
 
 // MemorySessionDriver is an in-memory implementation of SessionDriver.
 // Useful for testing or simple setups without external storage.
+// Its zero value is ready to use.
 type MemorySessionDriver struct {
 	mu        sync.Mutex
 	sessions  map[string]session
@@ -44,9 +45,7 @@ var _ SessionDriver[any, any] = (*MemorySessionDriver)(nil)
 
 // NewMemorySessionDriver initializes a MemorySessionDriver with an empty session store.
 func NewMemorySessionDriver() *MemorySessionDriver {
-	return &MemorySessionDriver{
-		sessions: make(map[string]session),
-	}
+	return &MemorySessionDriver{}
 }
 
 // Validate checks that the session ID exists and is unexpired,
@@ -96,6 +95,9 @@ func (m *MemorySessionDriver) Login(_ context.Context, user any) (string, error)
 		m.lastSweep = now
 	}
 
+	if m.sessions == nil {
+		m.sessions = make(map[string]session)
+	}
 	sessID := uniqid()
 	m.sessions[sessID] = session{uid: usr.ID, exp: now.Add(sessionTTL)}
 
