@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -169,7 +170,7 @@ func TestMemoryUserProvider_EmailIsCaseInsensitive(t *testing.T) {
 	if _, err := p.RegisterUser(ctx, &User{Email: "A@Example.com", Password: "secret"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.RegisterUser(ctx, &User{Email: "a@example.com", Password: "secret"}); !errors.Is(err, ErrUserAlreadyExists) {
+	if _, err := p.RegisterUser(ctx, &User{Email: "a@example.com", Password: strings.Repeat("a", 73)}); !errors.Is(err, ErrUserAlreadyExists) {
 		t.Errorf("got %v, want ErrUserAlreadyExists", err)
 	}
 	if _, err := p.FindByCredentials(ctx, PasswordCredentials{Email: "a@EXAMPLE.com", Password: "secret"}); err != nil {
