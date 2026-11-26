@@ -232,6 +232,16 @@ func TestManager(t *testing.T) {
 	}
 }
 
+func TestManager_RejectsNilDriver(t *testing.T) {
+	m := NewManager(Config{})
+	if err := m.RegisterDriver("broken", nil); err == nil {
+		t.Error("RegisterDriver accepted a nil mailer")
+	}
+	if err := m.SetDefaultDriver("broken"); !errors.Is(err, ErrMailerNotFound) {
+		t.Errorf("SetDefaultDriver(broken) = %v, want ErrMailerNotFound", err)
+	}
+}
+
 type mailerFunc func(context.Context, *Message) error
 
 func (f mailerFunc) Send(ctx context.Context, m *Message) error { return f(ctx, m) }

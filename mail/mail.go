@@ -77,6 +77,9 @@ func (m *Manager) Send(ctx context.Context, msg *Message) error {
 
 // RegisterDriver adds a mailer under a new driver name.
 func (m *Manager) RegisterDriver(driver Driver, mailer Mailer) error {
+	if mailer == nil {
+		return fmt.Errorf("mailer for driver %q is nil", driver)
+	}
 	if !m.mailers.Add(driver, mailer) {
 		return fmt.Errorf("driver %q already exists", driver)
 	}
