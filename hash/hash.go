@@ -46,14 +46,22 @@ func New() *Manager {
 }
 
 // Hash generates a password hash using the default Method.
+// It returns ErrHasherNotFound if the Manager has no hashers.
 func (m *Manager) Hash(password string) (string, error) {
+	if m.hashers == nil {
+		return "", ErrHasherNotFound
+	}
 	return m.hashers.Default().Hash(password)
 }
 
 // Check verifies a password against a hash. Bcrypt and argon2id hashes are
 // recognised by their prefix, so changing the default Method doesn't break
 // hashes that are already stored. Any other hash is checked with the default Method.
+// It returns ErrHasherNotFound if the Manager has no hashers.
 func (m *Manager) Check(password, hash string) (bool, error) {
+	if m.hashers == nil {
+		return false, ErrHasherNotFound
+	}
 	return m.hasherFor(hash).Check(password, hash)
 }
 

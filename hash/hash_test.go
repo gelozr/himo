@@ -132,6 +132,22 @@ func TestManager_ZeroValueMissingHasher(t *testing.T) {
 	})
 }
 
+func TestManager_ZeroValueHash(t *testing.T) {
+	var manager hash.Manager
+	if _, err := manager.Hash("password"); !errors.Is(err, hash.ErrHasherNotFound) {
+		t.Errorf("Hash() error = %v, want ErrHasherNotFound", err)
+	}
+}
+
+func TestManager_ZeroValueCheck(t *testing.T) {
+	var manager hash.Manager
+	for _, hashed := range []string{"$argon2id$", "$2b$", "custom"} {
+		if _, err := manager.Check("password", hashed); !errors.Is(err, hash.ErrHasherNotFound) {
+			t.Errorf("Check(%q) error = %v, want ErrHasherNotFound", hashed, err)
+		}
+	}
+}
+
 func TestManager_Hasher(t *testing.T) {
 	h := hash.New()
 
