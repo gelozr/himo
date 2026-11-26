@@ -2,9 +2,11 @@ package hash_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/gelozr/himo/hash"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func assertRoundTrip(t *testing.T, hasher hash.Hasher, password string) {
@@ -35,6 +37,13 @@ func TestBcryptHasher_RoundTrip(t *testing.T) {
 	password := "123456"
 
 	assertRoundTrip(t, hasher, password)
+}
+
+func TestBcryptHasher_HashPreservesPasswordTooLongError(t *testing.T) {
+	_, err := (hash.BcryptHasher{}).Hash(strings.Repeat("x", 73))
+	if !errors.Is(err, bcrypt.ErrPasswordTooLong) {
+		t.Errorf("Hash() error = %v, want wrapped %v", err, bcrypt.ErrPasswordTooLong)
+	}
 }
 
 func TestArgon2IDHasher_RoundTrip(t *testing.T) {
