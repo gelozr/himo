@@ -84,6 +84,13 @@ func TestMemorySessionDriver_RemovesExpiredSessions(t *testing.T) {
 	}
 }
 
+func TestManager_RegisterUserRejectsNilUser(t *testing.T) {
+	var user *User
+	if registered, err := New().RegisterUser(t.Context(), user); err == nil || registered != nil {
+		t.Fatalf("RegisterUser for nil *User = %v, %v; want nil and an error", registered, err)
+	}
+}
+
 func TestMemoryUserProvider_HashesPasswords(t *testing.T) {
 	ctx := context.Background()
 	p := NewMemoryUserProvider()
