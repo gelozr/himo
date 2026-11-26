@@ -145,6 +145,8 @@ func checkSMTPUTF8(client *smtp.Client, m *Message) error {
 	return nil
 }
 
+const maxHeaderLineLength = 998
+
 // buildMessage renders m as a MIME multipart/alternative message.
 func buildMessage(m *Message, now time.Time) ([]byte, error) {
 	if err := validateMessage(m); err != nil {
@@ -166,12 +168,17 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 		sb      strings.Builder
 		tooLong string
 	)
-	// Long values are folded (CRLF + space) between addresses and encoded words;
-	// a physical line still over the RFC 5322 limit of 998 characters is rejected.
 	writeHeader := func(k, v string) {
 		line := k + ": " + v
+		if k == "Subject" {
+			if encoded := mime.QEncoding.Encode("utf-8", v); encoded != v {
+				line = k + ": " + fold(encoded)
+			} else if len(line) > maxHeaderLineLength {
+				line = foldSubject(line)
+			}
+		}
 		for l := range strings.SplitSeq(line, "\r\n") {
-			if len(l) > 998 && tooLong == "" {
+			if len(l) > maxHeaderLineLength && tooLong == "" {
 				tooLong = k
 			}
 		}
@@ -180,7 +187,7 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 	writeHeader("MIME-Version", "1.0")
 	writeHeader("Date", now.Format(time.RFC1123Z))
 	writeHeader("Message-ID", fmt.Sprintf("<%d.%s@%s>", now.UnixNano(), uuid.NewString(), domain))
-	writeHeader("Subject", encode(m.Subject))
+	writeHeader("Subject", m.Subject)
 	writeHeader("From", formatAddress(m.From))
 	writeHeader("To", strings.Join(to, ",\r\n "))
 	for _, k := range slices.Sorted(maps.Keys(m.Headers)) {
@@ -312,6 +319,24 @@ func fold(v string) string {
 
 func encode(v string) string {
 	return fold(mime.QEncoding.Encode("utf-8", v))
+}
+
+func foldSubject(line string) string {
+	var folded strings.Builder
+	// Subject whitespace can be folded before text, but its trailing spaces cannot.
+	content := strings.TrimRight(line, " \t")
+	trailing := line[len(content):]
+	for len(content)+len(trailing) > maxHeaderLineLength {
+		cut := strings.LastIndexAny(content[:min(len(content), maxHeaderLineLength+1)], " \t")
+		cut = len(strings.TrimRight(content[:cut+1], " \t"))
+		if cut == 0 {
+			break
+		}
+		folded.WriteString(content[:cut])
+		folded.WriteString("\r\n")
+		content = content[cut:]
+	}
+	return folded.String() + content + trailing
 }
 
 // isFieldName reports whether k is a valid header name: printable ASCII except ':' (RFC 5322 section 3.6.8).

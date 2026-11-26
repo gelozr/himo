@@ -113,6 +113,25 @@ func TestBuildMessage_FoldsLongDisplayNames(t *testing.T) {
 	}
 }
 
+func TestBuildMessage_FoldsLongASCIISubject(t *testing.T) {
+	m := testMessage()
+	m.Subject = strings.Repeat("Status update  \t", 150) + "complete"
+	raw, err := buildMessage(m, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for line := range strings.SplitSeq(string(raw), "\r\n") {
+		if len(line) > 998 {
+			t.Fatalf("line has %d characters", len(line))
+		}
+	}
+	_, afterSubject, _ := strings.Cut(string(raw), "\r\nSubject: ")
+	subject, _, _ := strings.Cut(afterSubject, "\r\nFrom: ")
+	if strings.ReplaceAll(subject, "\r\n", "") != m.Subject {
+		t.Fatal("unfolded subject differs from the original")
+	}
+}
+
 func TestBuildMessage_RejectsInvalidMessages(t *testing.T) {
 	for name, edit := range map[string]func(*Message){
 		"subject": func(m *Message) { m.Subject = "hi\r\nBcc: victim@example.com" },
