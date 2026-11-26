@@ -127,6 +127,9 @@ func (a *Manager) RevokeToken(ctx context.Context, token string) error {
 
 // LookupHandler returns a named handler or ErrHandlerNotFound if it does not exist.
 func (a *Manager) LookupHandler(name string) (AnyHandler, error) {
+	if a.handlers == nil {
+		return nil, fmt.Errorf("%w: %s", ErrHandlerNotFound, name)
+	}
 	return a.handlers.Get(name)
 }
 
@@ -161,6 +164,9 @@ func (a *Manager) Extend(name string, option HandlerOption) error {
 
 // SetDefault sets the default handler to the named handler, returning an error if not found.
 func (a *Manager) SetDefault(name string) error {
+	if a.handlers == nil {
+		return fmt.Errorf("%w: %s", ErrHandlerNotFound, name)
+	}
 	return a.handlers.SetDefault(name)
 }
 
