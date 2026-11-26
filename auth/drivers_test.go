@@ -9,6 +9,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+func TestJWTDriver_IssueTokenRejectsNilUser(t *testing.T) {
+	d := NewJWTDriver([]byte("test-key"))
+	var user *User
+	if token, err := d.IssueToken(t.Context(), user); token != nil || !errors.Is(err, ErrInvalidUser) {
+		t.Fatalf("IssueToken for nil *User = %v, %v; want nil, ErrInvalidUser", token, err)
+	}
+}
+
 func TestJWTDriver_RevokeAndRefresh(t *testing.T) {
 	ctx := context.Background()
 	d := NewJWTDriver([]byte("test-key"))
