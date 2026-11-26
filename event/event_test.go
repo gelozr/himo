@@ -72,6 +72,37 @@ func TestBus_AsyncSurvivesCancelledContext(t *testing.T) {
 	}
 }
 
+func TestBus_AsyncWrapperCanPublish(t *testing.T) {
+	bus := NewBus[userCreated]()
+	ctx := t.Context()
+	var publishErr error
+	if err := bus.SetAsyncHandler(func(h Handler[userCreated]) Handler[userCreated] {
+		publishErr = bus.Publish(ctx, userCreated{})
+		return h
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	handlerErr := errors.New("handler called")
+	done := make(chan struct{})
+	go func() {
+		bus.SubscribeAsync(func(context.Context, userCreated) error { return handlerErr })
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("SubscribeAsync blocked when the wrapper called Publish")
+	}
+	if publishErr != nil {
+		t.Fatalf("Publish in wrapper returned %v", publishErr)
+	}
+	if err := bus.Publish(ctx, userCreated{}); !errors.Is(err, handlerErr) {
+		t.Errorf("Publish after subscription returned %v, want %v", err, handlerErr)
+	}
+}
+
 func TestBus_WaitForAsyncHandlers(t *testing.T) {
 	bus := NewBus[userCreated]()
 	var done bool
