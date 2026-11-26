@@ -14,6 +14,7 @@ import (
 	"net/mail"
 	"net/smtp"
 	"net/textproto"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -251,6 +252,9 @@ var reservedHeaders = map[string]bool{
 	"Content-Transfer-Encoding": true, // The multipart body uses the default 7bit encoding.
 }
 
+// SMTPUTF8 can carry Unicode domain labels, so this checks only ASCII syntax.
+var invalidSMTPDomainLabel = regexp.MustCompile(`^-|-$|[^a-zA-Z0-9\x{80}-\x{10FFFF}-]`)
+
 func checkAddress(a Address) error {
 	if hasNewline(a.Name) || hasNewline(a.Address) {
 		return fmt.Errorf("address %q contains a newline", a.Address)
@@ -259,9 +263,17 @@ func checkAddress(a Address) error {
 		return fmt.Errorf("invalid address %q", a.Address)
 	}
 	domain := a.Address[strings.LastIndex(a.Address, "@")+1:]
-	tag, _, hasColon := strings.Cut(domain, ":")
-	if strings.HasPrefix(domain, "[") && hasColon && !strings.EqualFold(tag, "[IPv6") {
-		return fmt.Errorf("invalid address %q: IPv6 literal requires an IPv6: tag", a.Address)
+	if strings.HasPrefix(domain, "[") {
+		tag, _, hasColon := strings.Cut(domain, ":")
+		if hasColon && !strings.EqualFold(tag, "[IPv6") {
+			return fmt.Errorf("invalid address %q: IPv6 literal requires an IPv6: tag", a.Address)
+		}
+		return nil
+	}
+	for label := range strings.SplitSeq(domain, ".") {
+		if invalidSMTPDomainLabel.MatchString(label) {
+			return fmt.Errorf("invalid address %q: invalid SMTP domain label %q", a.Address, label)
+		}
 	}
 	return nil
 }

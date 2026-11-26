@@ -291,6 +291,26 @@ func TestSMTPMailer_RejectsNilMessage(t *testing.T) {
 	}
 }
 
+func TestBuildMessage_RejectsInvalidSMTPDomainLabels(t *testing.T) {
+	for _, domain := range []string{"mail_host.example.com", "example+tag.com", "example.-mail.com", "example.mail-.com", "café_mail.example"} {
+		m := testMessage()
+		m.To[0].Address = `"to@desk"@` + domain
+		if _, err := buildMessage(m, time.Now()); err == nil {
+			t.Errorf("accepted invalid recipient domain %q", domain)
+		}
+	}
+}
+
+func TestBuildMessage_AcceptsSMTPDomainLabels(t *testing.T) {
+	for _, domain := range []string{"Mail-1.Example.com", "xn--caf-dma.example", "café.example", "[192.0.2.1]"} {
+		m := testMessage()
+		m.From.Address = `"from_desk@office"@` + domain
+		if _, err := buildMessage(m, time.Now()); err != nil {
+			t.Errorf("rejected valid sender domain %q: %v", domain, err)
+		}
+	}
+}
+
 func TestSMTPMailer_SendHonoursContext(t *testing.T) {
 	m, _ := fakeSMTP(t, true)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
