@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -57,14 +58,14 @@ var (
 	_ TokenRevoker          = (*JWTDriver)(nil)
 )
 
-// NewJWTDriver creates a JWTDriver that signs and verifies tokens with key.
+// NewJWTDriver creates a JWTDriver that signs and verifies tokens with a copy of key.
 // It panics if key is empty.
 func NewJWTDriver(key []byte) *JWTDriver {
 	if len(key) == 0 {
 		panic("auth: JWT key must not be empty")
 	}
 	return &JWTDriver{
-		verifyKey: key,
+		verifyKey: bytes.Clone(key),
 		revoked:   make(map[string]time.Time),
 	}
 }
