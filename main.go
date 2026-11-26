@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	netmail "net/mail"
@@ -282,7 +283,8 @@ func welcomeMail() (event.Handler[userRegistered], error) {
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(v); err != nil || decoder.Decode(new(json.RawMessage)) != io.EOF {
 		http.Error(w, "invalid JSON body", http.StatusBadRequest)
 		return false
 	}
