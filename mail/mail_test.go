@@ -138,14 +138,14 @@ func TestBuildMessage_RejectsInvalidMessages(t *testing.T) {
 }
 
 // fakeSMTP serves one connection. If silent, it never replies.
-func fakeSMTP(t *testing.T, silent bool) (*SMTPMailer, <-chan string) {
+func fakeSMTP(t *testing.T, silent bool) (*SMTPMailer, <-chan smtpMessage) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = ln.Close() })
 
-	got := make(chan string, 1)
+	got := make(chan smtpMessage, 1)
 	go func() {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -158,6 +158,7 @@ func fakeSMTP(t *testing.T, silent bool) (*SMTPMailer, <-chan string) {
 		}
 		tp := textproto.NewConn(conn)
 		_ = tp.PrintfLine("220 localhost ready")
+		var msg smtpMessage
 		for {
 			line, err := tp.ReadLine()
 			if err != nil {
@@ -169,12 +170,14 @@ func fakeSMTP(t *testing.T, silent bool) (*SMTPMailer, <-chan string) {
 			case line == "DATA":
 				_ = tp.PrintfLine("354 go ahead")
 				data, _ := tp.ReadDotBytes()
-				got <- string(data)
+				msg.data = string(data)
+				got <- msg
 				_ = tp.PrintfLine("250 ok")
 			case line == "QUIT":
 				_ = tp.PrintfLine("221 bye")
 				return
 			default:
+				msg.envelope = append(msg.envelope, line)
 				_ = tp.PrintfLine("250 ok")
 			}
 		}
@@ -184,13 +187,69 @@ func fakeSMTP(t *testing.T, silent bool) (*SMTPMailer, <-chan string) {
 	return &SMTPMailer{Host: "127.0.0.1", Port: addr.Port}, got
 }
 
+type smtpMessage struct {
+	envelope []string
+	data     string
+}
+
 func TestSMTPMailer_Send(t *testing.T) {
 	m, got := fakeSMTP(t, false)
 	if err := m.Send(context.Background(), testMessage()); err != nil {
 		t.Fatal(err)
 	}
-	if data := <-got; !strings.Contains(data, "Subject:") {
-		t.Errorf("server got %q", data)
+	if msg := <-got; !strings.Contains(msg.data, "Subject:") {
+		t.Errorf("server got %q", msg.data)
+	}
+}
+
+func TestSMTPMailer_SendQuotedMailboxes(t *testing.T) {
+	mailer, got := fakeSMTP(t, false)
+	m := testMessage()
+	m.From.Address = `"from@ \"desk\" \\  =?here"@example.com`
+	m.To[0].Address = `""@example.net`
+	m.To = append(m.To, Address{Address: `"even.simple"@example.org`})
+
+	if err := mailer.Send(t.Context(), m); err != nil {
+		t.Fatal(err)
+	}
+	msg := <-got
+	want := "MAIL FROM:<" + m.From.Address + ">\nRCPT TO:<" + m.To[0].Address + ">\nRCPT TO:<" + m.To[1].Address + ">"
+	if envelope := strings.Join(msg.envelope, "\n"); envelope != want {
+		t.Errorf("envelope = %q, want %q", envelope, want)
+	}
+	parsed, err := mail.ReadMessage(strings.NewReader(msg.data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if from := parsed.Header.Get("From"); from != `"Sender" <`+m.From.Address+">" {
+		t.Errorf("From = %q", from)
+	}
+	if to := parsed.Header.Get("To"); to != mime.QEncoding.Encode("utf-8", m.To[0].Name)+" <"+m.To[0].Address+">, <"+m.To[1].Address+">" {
+		t.Errorf("To = %q", to)
+	}
+	if id := parsed.Header.Get("Message-ID"); !strings.HasSuffix(id, "@example.com>") {
+		t.Errorf("Message-ID = %q", id)
+	}
+}
+
+func TestBuildMessage_RejectsNonBareMailboxes(t *testing.T) {
+	for _, address := range []string{
+		`Sender <sender@example.com>`,
+		`<"quoted"@example.com>`,
+		`"quoted"@example.com (Sender)`,
+		`"quoted"@ example.com`,
+		`"quoted"@example.com `,
+		`"not closed@example.com`,
+		`"bad \"@example.com`,
+		"\"bad\tspace\"@example.com",
+		"\"bad\\\tspace\"@example.com",
+		"\"bad\r\nspace\"@example.com",
+	} {
+		m := testMessage()
+		m.From.Address = address
+		if _, err := buildMessage(m, time.Now()); err == nil {
+			t.Errorf("expected error for %q", address)
+		}
 	}
 }
 
