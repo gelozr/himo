@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -39,6 +40,47 @@ func TestBroker_RoutesByType(t *testing.T) {
 	}
 	if err := bus.Publish(ctx, "wrong"); err == nil {
 		t.Error("expected error for wrong event type")
+	}
+}
+
+type publisherWithTypeHook struct {
+	Publisher
+	beforeType func()
+}
+
+func (p publisherWithTypeHook) Type() reflect.Type {
+	p.beforeType()
+	return p.Publisher.Type()
+}
+
+func TestBroker_RegisterBusTypeCanPublish(t *testing.T) {
+	ctx := t.Context()
+	broker := NewBroker()
+	broker.RegisterBus(NewBus[string]())
+
+	var publishErr error
+	bus := NewBus[userCreated]()
+	done := make(chan struct{})
+	go func() {
+		broker.RegisterBus(publisherWithTypeHook{
+			Publisher: bus,
+			beforeType: func() {
+				publishErr = broker.Publish(ctx, "ready")
+			},
+		})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("RegisterBus blocked when Publisher.Type called Publish")
+	}
+	if publishErr != nil {
+		t.Fatalf("Publish in Publisher.Type returned %v", publishErr)
+	}
+	if err := broker.Publish(ctx, userCreated{}); err != nil {
+		t.Errorf("Publish after registration returned %v", err)
 	}
 }
 
