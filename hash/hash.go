@@ -89,9 +89,13 @@ func (m *Manager) MustHasher(mt Method) Hasher {
 }
 
 // Extend registers a new Hasher under the given Method, overwriting if existing.
+// The Manager must be initialized with New.
 func (m *Manager) Extend(mt Method, hasher Hasher) error {
 	if hasher == nil {
 		return fmt.Errorf("hasher for method %q is nil", mt)
+	}
+	if m.hashers == nil {
+		return errors.New("hash manager is uninitialized (call New)")
 	}
 	m.hashers.Set(mt, hasher)
 	return nil
