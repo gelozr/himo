@@ -269,6 +269,8 @@ func TestBuildMessage_RejectsNonBareMailboxes(t *testing.T) {
 		"\"bad\tspace\"@example.com",
 		"\"bad\\\tspace\"@example.com",
 		"\"bad\r\nspace\"@example.com",
+		`sender@[2001:db8::1]`,
+		`"sender@desk"@[::1]`,
 		`sender@[IPv6:192.0.2.1]`,
 		`sender@[IPv6:2001:db8::xyz]`,
 		`sender@[IPv6:fe80::1%eth0]`,

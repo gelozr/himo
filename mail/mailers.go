@@ -258,6 +258,11 @@ func checkAddress(a Address) error {
 	if !mailbox.Valid(a.Address) {
 		return fmt.Errorf("invalid address %q", a.Address)
 	}
+	domain := a.Address[strings.LastIndex(a.Address, "@")+1:]
+	tag, _, hasColon := strings.Cut(domain, ":")
+	if strings.HasPrefix(domain, "[") && hasColon && !strings.EqualFold(tag, "[IPv6") {
+		return fmt.Errorf("invalid address %q: IPv6 literal requires an IPv6: tag", a.Address)
+	}
 	return nil
 }
 
