@@ -69,6 +69,9 @@ func (m *Manager) hasherFor(hash string) Hasher {
 
 // Hasher looks up a Hasher by Method. Returns ErrHasherNotFound if missing.
 func (m *Manager) Hasher(mt Method) (Hasher, error) {
+	if m.hashers == nil {
+		return nil, fmt.Errorf("%w: %s", ErrHasherNotFound, mt)
+	}
 	return m.hashers.Get(mt)
 }
 
@@ -89,6 +92,9 @@ func (m *Manager) Extend(mt Method, hasher Hasher) error {
 // SetDefault changes the default Method used by Hash and Check.
 // Returns ErrHasherNotFound if the Method is not registered.
 func (m *Manager) SetDefault(mt Method) error {
+	if m.hashers == nil {
+		return fmt.Errorf("%w: %s", ErrHasherNotFound, mt)
+	}
 	return m.hashers.SetDefault(mt)
 }
 
