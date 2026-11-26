@@ -39,6 +39,7 @@ var dummyHash = sync.OnceValue(func() string {
 // MemoryUserProvider is an in-memory, demo/test only UserProvider.
 // It stores users keyed by lowercased email and implements FindByCredentials
 // to satisfy AnyHandler’s dynamic handler model.
+// Its zero value is ready to use.
 type MemoryUserProvider struct {
 	mu    sync.RWMutex
 	users map[string]*User
@@ -50,9 +51,7 @@ var _ UserRegisterer[any] = (*MemoryUserProvider)(nil)
 // NewMemoryUserProvider creates an empty in-memory provider.
 // Intended for testing or demos; not for production use.
 func NewMemoryUserProvider() *MemoryUserProvider {
-	return &MemoryUserProvider{
-		users: make(map[string]*User),
-	}
+	return &MemoryUserProvider{}
 }
 
 // FindByCredentials looks up a user by email/password.
@@ -125,6 +124,9 @@ func (p *MemoryUserProvider) RegisterUser(_ context.Context, user any) (any, err
 		return nil, ErrUserAlreadyExists
 	}
 
+	if p.users == nil {
+		p.users = make(map[string]*User)
+	}
 	p.users[key] = &stored
 	cp := stored
 	return &cp, nil
