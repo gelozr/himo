@@ -94,6 +94,8 @@ func TestMailFrom(t *testing.T) {
 		{`"Welcome <Team>" <"desk@\"room\" >"@example.com>`, "Welcome <Team>", `"desk@\"room\" >"@example.com`},
 		{`"Welcome" <"@desk"@example.com>`, "Welcome", `"@desk"@example.com`},
 		{`Welcome <""@example.com>`, "Welcome", `""@example.com`},
+		{`noreply@[IPv6:2001:db8::1]`, "himo", `noreply@[IPv6:2001:db8::1]`},
+		{`"Welcome @[IPv6:2001:db8::1]" <"desk@room"@[ipv6:2001:db8::1]>`, "Welcome @[IPv6:2001:db8::1]", `"desk@room"@[ipv6:2001:db8::1]`},
 		{`quoted-local@example.com ("other"@example.net)`, `"other"@example.net`, "quoted-local@example.com"},
 	} {
 		t.Run(tc.value, func(t *testing.T) {
@@ -113,5 +115,12 @@ func TestMailFromRejectsInvalidQuotedLocalPart(t *testing.T) {
 	t.Setenv("MAIL_FROM", "Welcome <\"tab\tinside\"@example.com>")
 	if _, err := mailFrom(); err == nil {
 		t.Fatal("accepted a tab in quoted local part")
+	}
+}
+
+func TestMailFromRejectsInvalidIPv6Literal(t *testing.T) {
+	t.Setenv("MAIL_FROM", `Welcome <noreply@[IPv6:192.0.2.1]>`)
+	if _, err := mailFrom(); err == nil {
+		t.Fatal("accepted an IPv4 address with an IPv6 tag")
 	}
 }
