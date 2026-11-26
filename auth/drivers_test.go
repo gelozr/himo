@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -8,6 +9,17 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+func TestNewJWTDriver_CopiesKey(t *testing.T) {
+	want := []byte{1, 2, 3}
+	key := bytes.Clone(want)
+	d := NewJWTDriver(key)
+	clear(key)
+
+	if !bytes.Equal(d.verifyKey, want) {
+		t.Fatal("clearing the input changed the driver's key")
+	}
+}
 
 func TestJWTDriver_IssueTokenRejectsNilUser(t *testing.T) {
 	d := NewJWTDriver([]byte("test-key"))
