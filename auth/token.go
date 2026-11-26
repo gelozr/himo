@@ -121,7 +121,7 @@ func (d *JWTDriver) Parse(tokenStr string) (Claims, error) {
 // IssueToken creates a JWT for the given user (expected as *User).
 func (d *JWTDriver) IssueToken(_ context.Context, usr any) (any, error) {
 	u, ok := usr.(*User)
-	if !ok || u.ID == "" {
+	if !ok || u == nil || u.ID == "" {
 		return nil, ErrInvalidUser
 	}
 
