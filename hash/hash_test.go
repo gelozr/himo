@@ -203,6 +203,15 @@ func TestManager_SetDefault(t *testing.T) {
 	}
 }
 
+func TestManager_ExtendRejectsNilHasher(t *testing.T) {
+	manager := hash.New()
+	if err := manager.Extend(hash.Bcrypt, nil); err == nil {
+		t.Fatal("Extend(Bcrypt, nil) succeeded")
+	}
+
+	assertRoundTrip(t, manager, "password")
+}
+
 func TestManager_Hash(t *testing.T) {
 	hasher := hash.New()
 	password := "123456"
