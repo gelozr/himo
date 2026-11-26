@@ -117,6 +117,21 @@ func TestManager_MustHasher(t *testing.T) {
 	}
 }
 
+func TestManager_ZeroValueMissingHasher(t *testing.T) {
+	var manager hash.Manager
+
+	t.Run("lookup", func(t *testing.T) {
+		if _, err := manager.Hasher(hash.Bcrypt); !errors.Is(err, hash.ErrHasherNotFound) {
+			t.Errorf("Hasher() error = %v, want ErrHasherNotFound", err)
+		}
+	})
+	t.Run("set default", func(t *testing.T) {
+		if err := manager.SetDefault(hash.Bcrypt); !errors.Is(err, hash.ErrHasherNotFound) {
+			t.Errorf("SetDefault() error = %v, want ErrHasherNotFound", err)
+		}
+	})
+}
+
 func TestManager_Hasher(t *testing.T) {
 	h := hash.New()
 
