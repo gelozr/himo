@@ -142,6 +142,21 @@ func TestManager_RegisterUserRejectsNilUser(t *testing.T) {
 	}
 }
 
+func TestMemoryUserProvider_ZeroValue(t *testing.T) {
+	var p MemoryUserProvider
+	const email = "a@example.com"
+	if _, err := p.GetByEmail(email); !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("GetByEmail before registration = %v, want ErrUserNotFound", err)
+	}
+	registered, err := p.RegisterUser(t.Context(), &User{Email: email, Password: "secret"})
+	if err != nil {
+		t.Fatalf("RegisterUser: %v", err)
+	}
+	if u, err := p.GetByEmail(email); err != nil || *u != *registered.(*User) {
+		t.Fatalf("GetByEmail after registration = %v, %v; want %v", u, err, registered)
+	}
+}
+
 func TestMemoryUserProvider_HashesPasswords(t *testing.T) {
 	ctx := context.Background()
 	p := NewMemoryUserProvider()
