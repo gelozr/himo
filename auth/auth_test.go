@@ -326,6 +326,18 @@ func TestManager_RegisterHandler(t *testing.T) {
 	})
 }
 
+func TestManager_RegisterHandlerRejectsNil(t *testing.T) {
+	t.Parallel()
+	m := auth.New()
+
+	if err := m.RegisterHandler("missing", nil); err == nil {
+		t.Error("RegisterHandler accepted a nil handler")
+	}
+	if err := m.SetDefault("missing"); !errors.Is(err, auth.ErrHandlerNotFound) {
+		t.Errorf("SetDefault: got %v, want ErrHandlerNotFound", err)
+	}
+}
+
 func Test_RegisterHandler(t *testing.T) {
 	t.Parallel()
 	testRegisterHandler(t, func(opt auth.HandlerOption, handler string) error {
