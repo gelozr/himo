@@ -12,7 +12,8 @@
 //	LOG_FORMAT  text or json (default text)
 //	MAIL_HOST   when set, a welcome email is sent on registration
 //	MAIL_PORT   default 587
-//	MAIL_USER, MAIL_PASS, MAIL_FROM
+//	MAIL_USER, MAIL_PASS
+//	MAIL_FROM   sender mailbox, optionally with a display name
 package main
 
 import (
@@ -34,6 +35,7 @@ import (
 
 	"github.com/gelozr/himo/auth"
 	"github.com/gelozr/himo/event"
+	"github.com/gelozr/himo/internal/mailbox"
 	"github.com/gelozr/himo/log"
 	"github.com/gelozr/himo/mail"
 )
@@ -260,12 +262,10 @@ func welcomeMail() (event.Handler[userRegistered], error) {
 		MailUser: os.Getenv("MAIL_USER"),
 		MailPass: os.Getenv("MAIL_PASS"),
 	})
-	// MAIL_FROM may be "noreply@example.com" or "Name <noreply@example.com>".
-	parsed, err := netmail.ParseAddress(os.Getenv("MAIL_FROM"))
+	from, err := mailFrom()
 	if err != nil {
-		return nil, fmt.Errorf("MAIL_FROM: %w", err)
+		return nil, err
 	}
-	from := mail.Address{Name: cmp.Or(parsed.Name, "himo"), Address: parsed.Address}
 
 	return func(ctx context.Context, e userRegistered) error {
 		// Async handlers get a context without cancellation, so bound the send here.
@@ -279,6 +279,14 @@ func welcomeMail() (event.Handler[userRegistered], error) {
 			Text:    "Your account is ready.",
 		})
 	}, nil
+}
+
+func mailFrom() (mail.Address, error) {
+	parsed, err := mailbox.ParseAddress(os.Getenv("MAIL_FROM"))
+	if err != nil {
+		return mail.Address{}, fmt.Errorf("MAIL_FROM: %w", err)
+	}
+	return mail.Address{Name: cmp.Or(parsed.Name, "himo"), Address: parsed.Address}, nil
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {

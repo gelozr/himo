@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gelozr/himo/internal/mailbox"
 	"github.com/google/uuid"
 )
 
@@ -139,7 +140,7 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 
 	to := make([]string, len(m.To))
 	for i, a := range m.To {
-		to[i] = fold((&mail.Address{Name: a.Name, Address: a.Address}).String())
+		to[i] = formatAddress(a)
 	}
 	domain := m.From.Address[strings.LastIndex(m.From.Address, "@")+1:]
 
@@ -162,7 +163,7 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 	writeHeader("Date", now.Format(time.RFC1123Z))
 	writeHeader("Message-ID", fmt.Sprintf("<%d.%s@%s>", now.UnixNano(), uuid.NewString(), domain))
 	writeHeader("Subject", encode(m.Subject))
-	writeHeader("From", fold((&mail.Address{Name: m.From.Name, Address: m.From.Address}).String()))
+	writeHeader("From", formatAddress(m.From))
 	writeHeader("To", strings.Join(to, ",\r\n "))
 	for _, k := range slices.Sorted(maps.Keys(m.Headers)) {
 		writeHeader(textproto.CanonicalMIMEHeaderKey(k), encode(m.Headers[k]))
@@ -254,11 +255,20 @@ func checkAddress(a Address) error {
 	if hasNewline(a.Name) || hasNewline(a.Address) {
 		return fmt.Errorf("address %q contains a newline", a.Address)
 	}
-	parsed, err := mail.ParseAddress(a.Address)
-	if err != nil || parsed.Address != a.Address {
+	if !mailbox.Valid(a.Address) {
 		return fmt.Errorf("invalid address %q", a.Address)
 	}
 	return nil
+}
+
+func formatAddress(a Address) string {
+	// Let net/mail format the display name without re-quoting the validated mailbox.
+	const placeholder = "x@example.com"
+	name := strings.TrimSuffix((&mail.Address{Name: a.Name, Address: placeholder}).String(), "<"+placeholder+">")
+	if strings.HasPrefix(name, "=?") {
+		name = fold(name)
+	}
+	return name + "<" + a.Address + ">"
 }
 
 // fold breaks a header value onto continuation lines between encoded words.

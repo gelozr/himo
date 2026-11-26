@@ -72,3 +72,35 @@ func TestRoutes_RegisterLoginMeLogout(t *testing.T) {
 	do("POST", "/logout", refreshed.Token, "", http.StatusNoContent)
 	do("GET", "/me", refreshed.Token, "", http.StatusUnauthorized)
 }
+
+func TestMailFrom(t *testing.T) {
+	for _, tc := range []struct {
+		value, name, address string
+	}{
+		{`noreply@example.com`, "himo", `noreply@example.com`},
+		{`Welcome Team <noreply@example.com>`, "Welcome Team", `noreply@example.com`},
+		{`"no  reply"@example.com`, "himo", `"no  reply"@example.com`},
+		{`"Welcome <Team>" <"desk@\"room\" >"@example.com>`, "Welcome <Team>", `"desk@\"room\" >"@example.com`},
+		{`"Welcome" <"@desk"@example.com>`, "Welcome", `"@desk"@example.com`},
+		{`Welcome <""@example.com>`, "Welcome", `""@example.com`},
+		{`quoted-local@example.com ("other"@example.net)`, `"other"@example.net`, "quoted-local@example.com"},
+	} {
+		t.Run(tc.value, func(t *testing.T) {
+			t.Setenv("MAIL_FROM", tc.value)
+			from, err := mailFrom()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if from.Name != tc.name || from.Address != tc.address {
+				t.Errorf("MAIL_FROM = %#v, want name %q and address %q", from, tc.name, tc.address)
+			}
+		})
+	}
+}
+
+func TestMailFromRejectsInvalidQuotedLocalPart(t *testing.T) {
+	t.Setenv("MAIL_FROM", "Welcome <\"tab\tinside\"@example.com>")
+	if _, err := mailFrom(); err == nil {
+		t.Fatal("accepted a tab in quoted local part")
+	}
+}
