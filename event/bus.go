@@ -14,6 +14,7 @@ import (
 type Handler[T any] func(context.Context, T) error
 
 // Bus delivers events of type T to its subscribers. It is safe for concurrent use.
+// Its zero value is an empty Bus ready for use.
 type Bus[T any] struct {
 	mu           sync.RWMutex
 	handlers     []Handler[T]
@@ -23,9 +24,7 @@ type Bus[T any] struct {
 
 // NewBus creates a Bus whose async handlers run in their own goroutine.
 func NewBus[T any]() *Bus[T] {
-	b := &Bus[T]{}
-	b.asyncHandler = b.goHandler
-	return b
+	return &Bus[T]{}
 }
 
 // Subscribe adds h; Publish runs it synchronously and returns its error.
@@ -42,6 +41,9 @@ func (b *Bus[T]) SubscribeAsync(h Handler[T]) {
 	wrap := b.asyncHandler
 	b.mu.RUnlock()
 
+	if wrap == nil {
+		wrap = b.goHandler
+	}
 	b.Subscribe(wrap(h))
 }
 

@@ -98,6 +98,23 @@ func TestBus_InterfaceTypeDoesNotPanic(t *testing.T) {
 	}
 }
 
+func TestBus_ZeroValueRunsAsyncHandlers(t *testing.T) {
+	var bus Bus[userCreated]
+	var got string
+	bus.SubscribeAsync(func(_ context.Context, e userCreated) error {
+		got = e.ID
+		return nil
+	})
+
+	if err := bus.Publish(t.Context(), userCreated{ID: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	bus.Wait()
+	if got != "1" {
+		t.Errorf("async handler got ID %q, want %q", got, "1")
+	}
+}
+
 func TestBus_AsyncSurvivesCancelledContext(t *testing.T) {
 	bus := NewBus[userCreated]()
 	done := make(chan error, 1)
