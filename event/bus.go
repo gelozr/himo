@@ -38,13 +38,16 @@ func (b *Bus[T]) Subscribe(h Handler[T]) {
 // SubscribeAsync subscribes h to run in the background. Its errors and panics are logged
 // with slog's default logger, not returned by Publish.
 func (b *Bus[T]) SubscribeAsync(h Handler[T]) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.handlers = append(b.handlers, b.asyncHandler(h))
+	b.mu.RLock()
+	wrap := b.asyncHandler
+	b.mu.RUnlock()
+
+	b.Subscribe(wrap(h))
 }
 
 // SetAsyncHandler replaces how SubscribeAsync wraps handlers (e.g. a worker pool,
 // or a synchronous wrapper in tests). It only affects later subscriptions.
+// The wrapper runs during subscription and must be safe for concurrent calls.
 func (b *Bus[T]) SetAsyncHandler(ah func(Handler[T]) Handler[T]) error {
 	if ah == nil {
 		return errors.New("nil async handler")
