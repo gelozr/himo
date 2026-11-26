@@ -84,6 +84,21 @@ func TestRoutes_RegisterLoginMeLogout(t *testing.T) {
 	do("GET", "/me", refreshed.Token, "", http.StatusUnauthorized)
 }
 
+func TestDecodeRejectsOversizeBody(t *testing.T) {
+	for name, body := range map[string]string{
+		"JSON value":          `{"email":"` + strings.Repeat("a", 1<<20) + `"}`,
+		"trailing whitespace": `{}` + strings.Repeat(" ", 1<<20),
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(body))
+			w := httptest.NewRecorder()
+			if decode(w, r, new(credentials)) || w.Code != http.StatusRequestEntityTooLarge {
+				t.Fatalf("decode returned status %d, want %d", w.Code, http.StatusRequestEntityTooLarge)
+			}
+		})
+	}
+}
+
 func TestMailFrom(t *testing.T) {
 	for _, tc := range []struct {
 		value, name, address string

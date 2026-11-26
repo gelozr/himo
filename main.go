@@ -300,11 +300,19 @@ func mailFrom() (mail.Address, error) {
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(v); err != nil || decoder.Decode(new(json.RawMessage)) != io.EOF {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
-		return false
+	err := decoder.Decode(v)
+	if err == nil {
+		err = decoder.Decode(new(json.RawMessage))
+		if err == io.EOF {
+			return true
+		}
 	}
-	return true
+	if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+		http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+	} else {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	}
+	return false
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
