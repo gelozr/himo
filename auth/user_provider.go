@@ -95,10 +95,19 @@ func (p *MemoryUserProvider) GetByEmail(email string) (*User, error) {
 
 // RegisterUser stores a copy of the user with a generated ID and hashed password.
 // Expects user of type *User and returns the stored copy; the argument is not modified.
+// An existing email returns ErrUserAlreadyExists.
 func (p *MemoryUserProvider) RegisterUser(_ context.Context, user any) (any, error) {
 	u, ok := user.(*User)
 	if !ok || u == nil {
 		return nil, errors.New("invalid user type")
+	}
+
+	key := strings.ToLower(u.Email)
+	p.mu.RLock()
+	_, exists := p.users[key]
+	p.mu.RUnlock()
+	if exists {
+		return nil, ErrUserAlreadyExists
 	}
 
 	hashed, err := hash.Hash(u.Password)
@@ -111,8 +120,8 @@ func (p *MemoryUserProvider) RegisterUser(_ context.Context, user any) (any, err
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	key := strings.ToLower(u.Email)
-	if _, ok = p.users[key]; ok {
+	// Another registration may have stored this email during hashing.
+	if _, exists := p.users[key]; exists {
 		return nil, ErrUserAlreadyExists
 	}
 
