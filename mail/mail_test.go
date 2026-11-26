@@ -193,6 +193,13 @@ func TestSMTPMailer_Send(t *testing.T) {
 	}
 }
 
+func TestSMTPMailer_RejectsNilMessage(t *testing.T) {
+	m := NewSMTPMailer(Config{})
+	if err := m.Send(t.Context(), nil); err == nil || err.Error() != "message is nil" {
+		t.Fatalf("Send(nil) = %v, want message is nil", err)
+	}
+}
+
 func TestSMTPMailer_SendHonoursContext(t *testing.T) {
 	m, _ := fakeSMTP(t, true)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

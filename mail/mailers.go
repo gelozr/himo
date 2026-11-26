@@ -180,6 +180,9 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 // validateMessage rejects messages that can't be sent, and addresses or
 // header values that could inject extra headers.
 func validateMessage(m *Message) error {
+	if m == nil {
+		return errors.New("message is nil")
+	}
 	if err := checkAddress(m.From); err != nil {
 		return fmt.Errorf("from: %w", err)
 	}
