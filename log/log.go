@@ -53,6 +53,11 @@ func New(c ...Config) (*slog.Logger, func() error, error) {
 		return nil, nil, fmt.Errorf("log level: %w", err)
 	}
 
+	format := strings.ToLower(cfg.LogFormat)
+	if format != "text" && format != "json" {
+		return nil, nil, fmt.Errorf("unknown log format %q", cfg.LogFormat)
+	}
+
 	var (
 		w       io.Writer = os.Stdout
 		closeFn           = func() error { return nil }
@@ -72,16 +77,9 @@ func New(c ...Config) (*slog.Logger, func() error, error) {
 		return nil, nil, fmt.Errorf("unknown log output %q", cfg.LogOutput)
 	}
 
-	var h slog.Handler
-	switch strings.ToLower(cfg.LogFormat) {
-	case "text":
-		h = slog.NewTextHandler(w, &slog.HandlerOptions{Level: level})
-	case "json":
-		h = slog.NewJSONHandler(w, &slog.HandlerOptions{Level: level})
-	default:
-		_ = closeFn()
-		return nil, nil, fmt.Errorf("unknown log format %q", cfg.LogFormat)
+	opts := &slog.HandlerOptions{Level: level}
+	if format == "json" {
+		return slog.New(slog.NewJSONHandler(w, opts)), closeFn, nil
 	}
-
-	return slog.New(h), closeFn, nil
+	return slog.New(slog.NewTextHandler(w, opts)), closeFn, nil
 }

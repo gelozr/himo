@@ -39,3 +39,14 @@ func TestNew_RejectsBadConfig(t *testing.T) {
 		}
 	}
 }
+
+func TestNew_InvalidFormatDoesNotCreateLogDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "logs")
+	path := filepath.Join(dir, "app.log")
+	if _, _, err := New(Config{LogFormat: "xml", LogOutput: "file", LogPath: path}); err == nil {
+		t.Fatal("expected an invalid format error")
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("expected no log directory, got stat error %v", err)
+	}
+}
