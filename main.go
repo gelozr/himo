@@ -25,7 +25,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	netmail "net/mail"
 	"os"
 	"os/signal"
 	"strconv"
@@ -46,7 +45,7 @@ type credentials struct {
 }
 
 func (c credentials) validate() error {
-	if addr, err := netmail.ParseAddress(c.Email); err != nil || addr.Address != c.Email {
+	if !mailbox.Valid(c.Email) {
 		return errors.New("invalid email")
 	}
 	// bcrypt only uses the first 72 bytes and rejects longer input.

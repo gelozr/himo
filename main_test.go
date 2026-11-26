@@ -52,6 +52,17 @@ func TestRoutes_RegisterLoginMeLogout(t *testing.T) {
 	do("POST", "/register", "", account+" \n", http.StatusCreated)
 	do("POST", "/register", "", account, http.StatusConflict)
 	do("POST", "/register", "", `{"email":"b@example.com","password":"short"}`, http.StatusBadRequest)
+	for _, body := range []string{
+		`{"email":"Desk <\"front desk\"@example.com>","password":"correct horse"}`,
+		`{"email":"<\"front desk\"@example.com>","password":"correct horse"}`,
+		`{"email":"\"front desk\"@example.com (Desk)","password":"correct horse"}`,
+		`{"email":"\"front\ndesk\"@example.com","password":"correct horse"}`,
+	} {
+		do("POST", "/register", "", body, http.StatusBadRequest)
+	}
+	quotedAccount := `{"email":"\"front desk\"@example.com","password":"correct horse"}`
+	do("POST", "/register", "", quotedAccount, http.StatusCreated)
+	do("POST", "/login", "", quotedAccount, http.StatusOK)
 	do("POST", "/login", "", `{"email":"a@example.com","password":"wrong password"}`, http.StatusUnauthorized)
 
 	var login struct{ Token string }
