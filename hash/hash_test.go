@@ -549,3 +549,18 @@ func TestManager_CheckDetectsMethodFromHash(t *testing.T) {
 		}
 	}
 }
+
+func TestManager_CheckBcryptHashWithoutMinorVersion(t *testing.T) {
+	m := hash.New()
+	const storedHash = "$2$10$XajjQvNhvvRt5GSeFk1xFeyqRrsxkhBkUiQeg0dt.wU1qD4aFDcga"
+	if ok, err := m.Check("allmine", storedHash); err != nil || !ok {
+		t.Fatalf("Check with bcrypt default = %v, %v, want true, nil", ok, err)
+	}
+
+	if err := m.SetDefault(hash.Argon2ID); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := m.Check("allmine", storedHash); err != nil || !ok {
+		t.Errorf("Check with argon2id default = %v, %v, want true, nil", ok, err)
+	}
+}

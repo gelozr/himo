@@ -61,7 +61,7 @@ func (m *Manager) hasherFor(hash string) Hasher {
 	switch {
 	case strings.HasPrefix(hash, "$argon2id$"):
 		return m.hashers.MustGet(Argon2ID)
-	case strings.HasPrefix(hash, "$2a$"), strings.HasPrefix(hash, "$2b$"), strings.HasPrefix(hash, "$2y$"):
+	case strings.HasPrefix(hash, "$2$"), strings.HasPrefix(hash, "$2a$"), strings.HasPrefix(hash, "$2b$"), strings.HasPrefix(hash, "$2y$"):
 		return m.hashers.MustGet(Bcrypt)
 	}
 	return m.hashers.Default()
