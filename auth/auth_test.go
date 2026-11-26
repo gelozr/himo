@@ -442,6 +442,24 @@ func TestManager_LookupHandler(t *testing.T) {
 	})
 }
 
+func TestZeroValueManagerMissingHandler(t *testing.T) {
+	t.Parallel()
+	var manager auth.Manager
+
+	t.Run("lookup", func(t *testing.T) {
+		t.Parallel()
+		if handler, err := manager.LookupHandler("missing"); handler != nil || !errors.Is(err, auth.ErrHandlerNotFound) {
+			t.Errorf("LookupHandler() = (%v, %v), want (nil, ErrHandlerNotFound)", handler, err)
+		}
+	})
+	t.Run("set default", func(t *testing.T) {
+		t.Parallel()
+		if err := manager.SetDefault("missing"); !errors.Is(err, auth.ErrHandlerNotFound) {
+			t.Errorf("SetDefault() = %v, want ErrHandlerNotFound", err)
+		}
+	})
+}
+
 func Test_LookupHandler(t *testing.T) {
 	t.Parallel()
 	testLookupHandler(t, func(opt auth.HandlerOption, handler string) (auth.AnyHandler, error) {
