@@ -9,6 +9,7 @@ import (
 )
 
 var quotedLocal = regexp.MustCompile(`"(?:[^"\\]|\\.)*"@`)
+var ipv6Literal = regexp.MustCompile(`(?i)@\[IPv6:[^\[\]]+\]`)
 
 // Valid reports whether address is a bare mailbox, without header syntax outside it.
 func Valid(address string) bool {
@@ -38,8 +39,29 @@ func Valid(address string) bool {
 	return err == nil && parsed.Address == address
 }
 
-// ParseAddress keeps the original quoting when parsing a mailbox with an optional name.
+// ParseAddress preserves SMTP mailbox syntax when parsing an optional display name.
 func ParseAddress(value string) (*mail.Address, error) {
+	parsed, err := parseAddress(value)
+	if err == nil {
+		return parsed, nil
+	}
+	for _, span := range ipv6Literal.FindAllStringIndex(value, -1) {
+		start, end := span[0], span[1]
+		literal := value[start:end]
+		untagged := "@[" + literal[len("@[IPv6:"):]
+		candidate, parseErr := parseAddress(value[:start] + untagged + value[end:])
+		if parseErr != nil || !strings.HasSuffix(candidate.Address, untagged) {
+			continue
+		}
+		candidate.Address = strings.TrimSuffix(candidate.Address, untagged) + literal
+		if Valid(candidate.Address) {
+			return candidate, nil
+		}
+	}
+	return nil, err
+}
+
+func parseAddress(value string) (*mail.Address, error) {
 	parsed, err := mail.ParseAddress(value)
 	probe := "quoted-local@"
 	if parsed != nil && strings.HasPrefix(parsed.Address, probe) {
