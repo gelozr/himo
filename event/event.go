@@ -30,9 +30,12 @@ func NewBroker() *Broker {
 
 // RegisterBus routes events of bus.Type() to bus, replacing any bus already registered for it.
 func (r *Broker) RegisterBus(bus Publisher) {
+	// Publisher.Type can call back into the broker.
+	t := bus.Type()
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.buses[bus.Type()] = bus
+	r.buses[t] = bus
 }
 
 // Publish sends event to the bus registered for its dynamic type.
