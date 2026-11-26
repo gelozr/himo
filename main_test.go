@@ -124,3 +124,18 @@ func TestMailFromRejectsInvalidIPv6Literal(t *testing.T) {
 		t.Fatal("accepted an IPv4 address with an IPv6 tag")
 	}
 }
+
+func TestWelcomeMailRejectsOutOfRangePort(t *testing.T) {
+	t.Setenv("MAIL_HOST", "localhost")
+	t.Setenv("MAIL_FROM", "noreply@example.com")
+
+	for _, port := range []string{"-1", "0", "65536"} {
+		t.Run(port, func(t *testing.T) {
+			t.Setenv("MAIL_PORT", port)
+			_, err := welcomeMail()
+			if err == nil || !strings.HasPrefix(err.Error(), "MAIL_PORT:") {
+				t.Fatalf("welcomeMail() error = %v, want MAIL_PORT error", err)
+			}
+		})
+	}
+}

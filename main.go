@@ -254,6 +254,9 @@ func welcomeMail() (event.Handler[userRegistered], error) {
 	if err != nil {
 		return nil, fmt.Errorf("MAIL_PORT: %w", err)
 	}
+	if port < 1 || port > 65535 {
+		return nil, errors.New("MAIL_PORT: must be between 1 and 65535")
+	}
 
 	mailer := mail.NewManager(mail.Config{
 		MailHost: os.Getenv("MAIL_HOST"),
