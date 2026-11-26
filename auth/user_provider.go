@@ -59,7 +59,7 @@ func NewMemoryUserProvider() *MemoryUserProvider {
 func (p *MemoryUserProvider) FindByCredentials(_ context.Context, credentials any) (any, error) {
 	creds, ok := credentials.(PasswordCredentials)
 	if !ok {
-		return nil, errors.New("invalid credentials type")
+		return nil, &kindError{"invalid credentials type", ErrInvalidCredentials}
 	}
 
 	u, err := p.GetByEmail(creds.Email)

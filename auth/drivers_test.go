@@ -142,6 +142,12 @@ func TestManager_RegisterUserRejectsNilUser(t *testing.T) {
 	}
 }
 
+func TestManager_AuthenticateClassifiesInvalidCredentialType(t *testing.T) {
+	if _, err := New().Authenticate(t.Context(), "credentials"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("Authenticate = %v; want ErrInvalidCredentials", err)
+	}
+}
+
 func TestMemoryUserProvider_ZeroValue(t *testing.T) {
 	var p MemoryUserProvider
 	const email = "a@example.com"
