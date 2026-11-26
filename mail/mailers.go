@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/gelozr/himo/internal/mailbox"
 	"github.com/google/uuid"
@@ -103,6 +104,9 @@ func (s *SMTPMailer) deliver(conn net.Conn, m *Message, msg []byte) error {
 			return fmt.Errorf("client auth: %w", err)
 		}
 	}
+	if err := checkSMTPUTF8(client, m); err != nil {
+		return err
+	}
 	if err := client.Mail(m.From.Address); err != nil {
 		return fmt.Errorf("client mail: %w", err)
 	}
@@ -125,6 +129,19 @@ func (s *SMTPMailer) deliver(conn net.Conn, m *Message, msg []byte) error {
 
 	// The server has accepted the message at this point; a failed QUIT doesn't un-send it.
 	_ = client.Quit()
+	return nil
+}
+
+func checkSMTPUTF8(client *smtp.Client, m *Message) error {
+	if ok, _ := client.Extension("SMTPUTF8"); ok {
+		return nil
+	}
+	nonASCII := func(a Address) bool {
+		return strings.ContainsFunc(a.Address, func(r rune) bool { return r > unicode.MaxASCII })
+	}
+	if nonASCII(m.From) || slices.ContainsFunc(m.To, nonASCII) {
+		return errors.New("SMTP server does not advertise SMTPUTF8 required by an envelope address")
+	}
 	return nil
 }
 

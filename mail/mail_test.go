@@ -138,7 +138,7 @@ func TestBuildMessage_RejectsInvalidMessages(t *testing.T) {
 }
 
 // fakeSMTP serves one connection. If silent, it never replies.
-func fakeSMTP(t *testing.T, silent bool) (*SMTPMailer, <-chan smtpMessage) {
+func fakeSMTP(t *testing.T, silent bool, extensions ...string) (*SMTPMailer, <-chan smtpMessage) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -159,6 +159,7 @@ func fakeSMTP(t *testing.T, silent bool) (*SMTPMailer, <-chan smtpMessage) {
 		tp := textproto.NewConn(conn)
 		_ = tp.PrintfLine("220 localhost ready")
 		var msg smtpMessage
+		defer func() { got <- msg }()
 		for {
 			line, err := tp.ReadLine()
 			if err != nil {
@@ -166,12 +167,15 @@ func fakeSMTP(t *testing.T, silent bool) (*SMTPMailer, <-chan smtpMessage) {
 			}
 			switch {
 			case strings.HasPrefix(line, "EHLO"):
-				_ = tp.PrintfLine("250 localhost")
+				ehlo := append([]string{"localhost"}, extensions...)
+				for _, line := range ehlo[:len(ehlo)-1] {
+					_ = tp.PrintfLine("250-%s", line)
+				}
+				_ = tp.PrintfLine("250 %s", ehlo[len(ehlo)-1])
 			case line == "DATA":
 				_ = tp.PrintfLine("354 go ahead")
 				data, _ := tp.ReadDotBytes()
 				msg.data = string(data)
-				got <- msg
 				_ = tp.PrintfLine("250 ok")
 			case line == "QUIT":
 				_ = tp.PrintfLine("221 bye")
@@ -199,6 +203,45 @@ func TestSMTPMailer_Send(t *testing.T) {
 	}
 	if msg := <-got; !strings.Contains(msg.data, "Subject:") {
 		t.Errorf("server got %q", msg.data)
+	}
+}
+
+func TestSMTPMailer_SendRequiresSMTPUTF8(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		from       string
+		to         string
+		extensions []string
+	}{
+		{name: "sender", from: "fröm@example.com", to: "to@example.com"},
+		{name: "second recipient", from: "from@example.com", to: "tö@example.com"},
+		{name: "extension advertised", from: "fröm@example.com", to: "tö@example.com", extensions: []string{"SMTPUTF8", "8BITMIME"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mailer, got := fakeSMTP(t, false, tc.extensions...)
+			m := testMessage()
+			m.From.Address = tc.from
+			m.To = append(m.To, Address{Address: tc.to})
+
+			err := mailer.Send(t.Context(), m)
+			if len(tc.extensions) == 0 {
+				if err == nil || !strings.Contains(err.Error(), "SMTPUTF8") {
+					t.Fatalf("Send() = %v, want an SMTPUTF8 error", err)
+				}
+				if msg := <-got; len(msg.envelope) != 0 {
+					t.Errorf("server received SMTP commands %q", msg.envelope)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			msg := <-got
+			want := "MAIL FROM:<" + tc.from + "> BODY=8BITMIME SMTPUTF8\nRCPT TO:<" + m.To[0].Address + ">\nRCPT TO:<" + tc.to + ">"
+			if envelope := strings.Join(msg.envelope, "\n"); envelope != want {
+				t.Errorf("envelope = %q, want %q", envelope, want)
+			}
+		})
 	}
 }
 
