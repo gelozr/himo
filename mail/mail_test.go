@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -32,7 +33,7 @@ func TestBuildMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, err := mail.ReadMessage(strings.NewReader(string(raw)))
+	msg, err := mail.ReadMessage(bytes.NewReader(raw))
 	if err != nil {
 		t.Fatalf("not a valid message: %v", err)
 	}
@@ -81,7 +82,7 @@ func TestBuildMessage_FoldsLongHeaders(t *testing.T) {
 		}
 	}
 
-	msg, err := mail.ReadMessage(strings.NewReader(string(raw)))
+	msg, err := mail.ReadMessage(bytes.NewReader(raw))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +103,7 @@ func TestBuildMessage_FoldsLongDisplayNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	msg, err := mail.ReadMessage(strings.NewReader(string(raw)))
+	msg, err := mail.ReadMessage(bytes.NewReader(raw))
 	if err != nil {
 		t.Fatal(err)
 	}
