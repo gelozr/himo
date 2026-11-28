@@ -2,6 +2,7 @@ package registry
 
 import (
 	"errors"
+	"sync"
 	"testing"
 )
 
@@ -58,18 +59,17 @@ func TestRegistry_Concurrent(_ *testing.T) {
 	r.Set("a", 1)
 	r.Set("b", 2)
 
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
+	var writers sync.WaitGroup
+	writers.Go(func() {
 		for i := range 200 {
 			r.Set("a", i)
 			_ = r.SetDefault("b")
 			_ = r.SetDefault("a")
 		}
-	}()
+	})
 	for range 200 {
 		_ = r.Default()
 		_, _ = r.Get("b")
 	}
-	<-done
+	writers.Wait()
 }
