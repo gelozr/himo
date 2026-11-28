@@ -24,13 +24,12 @@ func Valid(address string) bool {
 			return false
 		}
 		for i := 0; i < len(local); i++ {
-			if local[i] == '\\' {
+			if ch := local[i]; ch == '\\' {
 				i++
-				if local[i] > '~' {
+				if local[i] < ' ' || local[i] > '~' {
 					return false
 				}
-			}
-			if local[i] < ' ' || local[i] == '\x7f' {
+			} else if ch < ' ' || ch == '\x7f' {
 				return false
 			}
 		}
