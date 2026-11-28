@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"maps"
 	"sync"
 	"time"
 
@@ -89,11 +90,9 @@ func (m *MemorySessionDriver) Login(_ context.Context, user any) (string, error)
 	defer m.mu.Unlock()
 
 	if now.Sub(m.lastSweep) > sweepInterval {
-		for id, s := range m.sessions {
-			if now.After(s.exp) {
-				delete(m.sessions, id)
-			}
-		}
+		maps.DeleteFunc(m.sessions, func(_ string, s session) bool {
+			return now.After(s.exp)
+		})
 		m.lastSweep = now
 	}
 
