@@ -163,16 +163,14 @@ func (BcryptHasher) Hash(password string) (string, error) {
 // Check compares a plaintext password against a bcrypt hash.
 func (BcryptHasher) Check(password, hash string) (bool, error) {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	if err != nil {
-		switch {
-		case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
-			return false, nil
-		default:
-			return false, fmt.Errorf("bcrypt compare password hash: %w", err)
-		}
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
+		return false, nil
+	default:
+		return false, fmt.Errorf("bcrypt compare password hash: %w", err)
 	}
-
-	return true, nil
 }
 
 // Argon2IDHasher implements Hasher using the argon2id algorithm.
