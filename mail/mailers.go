@@ -194,7 +194,8 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 	writeHeader("From", formatAddress(m.From))
 	writeHeader("To", strings.Join(to, ",\r\n "))
 	for _, k := range slices.Sorted(maps.Keys(m.Headers)) {
-		writeHeader(textproto.CanonicalMIMEHeaderKey(k), encode(m.Headers[k]))
+		encoded := mime.QEncoding.Encode("utf-8", m.Headers[k])
+		writeHeader(textproto.CanonicalMIMEHeaderKey(k), fold(encoded))
 	}
 	writeHeader("Content-Type", "multipart/alternative; boundary="+boundary)
 	if tooLong != "" {
@@ -322,10 +323,6 @@ func formatAddress(a Address) string {
 // fold breaks a header value onto continuation lines between encoded words.
 func fold(v string) string {
 	return strings.ReplaceAll(v, " =?", "\r\n =?")
-}
-
-func encode(v string) string {
-	return fold(mime.QEncoding.Encode("utf-8", v))
 }
 
 func foldSubject(line string) string {
