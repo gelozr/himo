@@ -52,7 +52,7 @@ func New(option ...HandlerOption) *Manager {
 	if o.Driver == nil {
 		// A random key per process: tokens don't survive restarts. Pass your own driver to persist them.
 		key := make([]byte, 32)
-		_, _ = rand.Read(key)
+		rand.Read(key)
 		o.Driver = NewJWTDriver(key)
 	}
 	if o.UserProvider == nil {
