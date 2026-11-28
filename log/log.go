@@ -65,8 +65,10 @@ func New(c ...Config) (*slog.Logger, func() error, error) {
 	switch strings.ToLower(cfg.LogOutput) {
 	case "stdout":
 	case "file":
-		if err := os.MkdirAll(filepath.Dir(cfg.LogPath), 0o750); err != nil {
-			return nil, nil, fmt.Errorf("create output dir: %w", err)
+		if dir, _ := filepath.Split(cfg.LogPath); dir != "" {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
+				return nil, nil, fmt.Errorf("create output dir: %w", err)
+			}
 		}
 		f, err := os.OpenFile(cfg.LogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {

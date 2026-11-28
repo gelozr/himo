@@ -32,6 +32,21 @@ func TestNew_JSONFile(t *testing.T) {
 	}
 }
 
+func TestNew_FilePathWithParentTraversal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nested") + "/../app.log"
+	_, closeFn, err := New(Config{LogOutput: "file", LogPath: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := closeFn(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "app.log")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestNew_RejectsBadConfig(t *testing.T) {
 	for _, c := range []Config{{LogLevel: "loud"}, {LogFormat: "xml"}, {LogOutput: "printer"}} {
 		if _, _, err := New(c); err == nil {
