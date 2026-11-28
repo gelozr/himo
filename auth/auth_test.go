@@ -284,17 +284,16 @@ func testRegisterHandler(t *testing.T, fn func(auth.HandlerOption, string) error
 	tests := []struct {
 		name    string
 		handler string
-		wantErr bool
+		wantErr error
 	}{
 		{
 			name:    "handler already registered",
 			handler: "test",
-			wantErr: true,
+			wantErr: auth.ErrHandlerAlreadyRegistered,
 		},
 		{
 			name:    "handler new",
 			handler: "new",
-			wantErr: false,
 		},
 	}
 
@@ -303,12 +302,8 @@ func testRegisterHandler(t *testing.T, fn func(auth.HandlerOption, string) error
 			t.Parallel()
 			err := fn(auth.HandlerOption{Driver: &MockDriver{}, UserProvider: &MockUserProvider{}}, tt.handler)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("SetDefault() expected error = %v, got %v", tt.wantErr, err)
-			}
-
-			if tt.wantErr && !errors.Is(err, auth.ErrHandlerAlreadyRegistered) {
-				t.Errorf("SetDefault() expected error = %v, got %v", auth.ErrHandlerAlreadyRegistered, err)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("RegisterHandler() error = %v, want %v", err, tt.wantErr)
 			}
 		})
 	}
