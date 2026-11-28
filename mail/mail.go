@@ -67,18 +67,28 @@ func NewManager(cfg Config) *Manager {
 
 // Mailer returns the mailer registered under driver.
 func (m *Manager) Mailer(driver Driver) (Mailer, error) {
+	if m.mailers == nil {
+		return nil, fmt.Errorf("%w: %s", ErrMailerNotFound, driver)
+	}
 	return m.mailers.Get(driver)
 }
 
 // Send sends the message with the default driver's mailer.
 func (m *Manager) Send(ctx context.Context, msg *Message) error {
+	if m.mailers == nil {
+		return ErrMailerNotFound
+	}
 	return m.mailers.Default().Send(ctx, msg)
 }
 
 // RegisterDriver adds a mailer under a new driver name.
+// The Manager must be initialized with NewManager.
 func (m *Manager) RegisterDriver(driver Driver, mailer Mailer) error {
 	if mailer == nil {
 		return fmt.Errorf("mailer for driver %q is nil", driver)
+	}
+	if m.mailers == nil {
+		return errors.New("mail manager is uninitialized (call NewManager)")
 	}
 	if !m.mailers.Add(driver, mailer) {
 		return fmt.Errorf("driver %q already exists", driver)
@@ -88,5 +98,8 @@ func (m *Manager) RegisterDriver(driver Driver, mailer Mailer) error {
 
 // SetDefaultDriver makes Send use the mailer registered under driver.
 func (m *Manager) SetDefaultDriver(driver Driver) error {
+	if m.mailers == nil {
+		return fmt.Errorf("%w: %s", ErrMailerNotFound, driver)
+	}
 	return m.mailers.SetDefault(driver)
 }
