@@ -244,12 +244,14 @@ func requireUser(users *auth.Manager, next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, ok := bearerToken(r)
 		if !ok {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="himo"`)
 			http.Error(w, "missing bearer token", http.StatusUnauthorized)
 			return
 		}
 
 		verified, err := users.Validate(r.Context(), token)
 		if err != nil {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="himo", error="invalid_token"`)
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
