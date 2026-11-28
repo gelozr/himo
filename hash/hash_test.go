@@ -248,8 +248,8 @@ func TestManager_Hash(t *testing.T) {
 		expectedHash string
 		hasher       *mockHasher
 	}{
-		{name: "hash success", expectedHash: "mock:123456", hasher: &mockHasher{calledHash: true}},
-		{name: "hash failed", expectedHash: "", hasher: &mockHasher{calledHash: true, shouldFailHash: true}},
+		{name: "hash success", expectedHash: "mock:123456", hasher: &mockHasher{}},
+		{name: "hash failed", expectedHash: "", hasher: &mockHasher{shouldFailHash: true}},
 	}
 
 	for _, tt := range tests {
@@ -293,14 +293,14 @@ func TestManager_Check(t *testing.T) {
 			password:      "123456",
 			hashed:        "mock:123456",
 			expectedCheck: true,
-			hasher:        &mockHasher{calledCheck: true},
+			hasher:        &mockHasher{},
 		},
 		{
 			name:          "check failed",
 			password:      "wrong password",
 			hashed:        "mock:123456",
 			expectedCheck: false,
-			hasher:        &mockHasher{calledCheck: true, shouldFailCheck: true},
+			hasher:        &mockHasher{shouldFailCheck: true},
 		},
 	}
 
@@ -449,8 +449,8 @@ func TestHash(t *testing.T) {
 		expectedHash string
 		hasher       *mockHasher
 	}{
-		{name: "hash success", expectedHash: "mock:123456", hasher: &mockHasher{calledHash: true}},
-		{name: "hash failed", expectedHash: "", hasher: &mockHasher{calledHash: true, shouldFailHash: true}},
+		{name: "hash success", expectedHash: "mock:123456", hasher: &mockHasher{}},
+		{name: "hash failed", expectedHash: "", hasher: &mockHasher{shouldFailHash: true}},
 	}
 
 	for _, tt := range tests {
@@ -492,14 +492,14 @@ func TestCheck(t *testing.T) {
 			password:      "123456",
 			hashed:        "mock:123456",
 			expectedCheck: true,
-			hasher:        &mockHasher{calledCheck: true},
+			hasher:        &mockHasher{},
 		},
 		{
 			name:          "check failed",
 			password:      "wrong password",
 			hashed:        "mock:123456",
 			expectedCheck: false,
-			hasher:        &mockHasher{calledCheck: true, shouldFailCheck: true},
+			hasher:        &mockHasher{shouldFailCheck: true},
 		},
 	}
 
