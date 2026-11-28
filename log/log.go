@@ -80,8 +80,11 @@ func New(c ...Config) (*slog.Logger, func() error, error) {
 	}
 
 	opts := &slog.HandlerOptions{Level: level}
+	var handler slog.Handler
 	if format == "json" {
-		return slog.New(slog.NewJSONHandler(w, opts)), closeFn, nil
+		handler = slog.NewJSONHandler(w, opts)
+	} else {
+		handler = slog.NewTextHandler(w, opts)
 	}
-	return slog.New(slog.NewTextHandler(w, opts)), closeFn, nil
+	return slog.New(handler), closeFn, nil
 }
