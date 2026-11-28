@@ -326,9 +326,10 @@ func serverError(w http.ResponseWriter, r *http.Request, logger *slog.Logger, er
 	http.Error(w, "internal server error", http.StatusInternalServerError)
 }
 
-// bearerToken reads "Authorization: Bearer <token>". The scheme is case-insensitive (RFC 7235).
+// bearerToken reads a case-insensitive Bearer scheme followed by one or more spaces (RFC 6750).
 func bearerToken(r *http.Request) (string, bool) {
 	scheme, token, ok := strings.Cut(r.Header.Get("Authorization"), " ")
+	token = strings.TrimLeft(token, " ")
 	if !ok || !strings.EqualFold(scheme, "Bearer") || token == "" {
 		return "", false
 	}
