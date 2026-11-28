@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Errors returned by session drivers.
@@ -98,7 +100,7 @@ func (m *MemorySessionDriver) Login(_ context.Context, user any) (string, error)
 	if m.sessions == nil {
 		m.sessions = make(map[string]session)
 	}
-	sessID := uniqid()
+	sessID := uuid.NewString()
 	m.sessions[sessID] = session{uid: usr.ID, exp: now.Add(sessionTTL)}
 
 	return sessID, nil

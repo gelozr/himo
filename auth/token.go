@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 // Errors returned by JWTDriver.
@@ -78,7 +79,7 @@ func (d *JWTDriver) Sign(uid string, authTime time.Time) (string, time.Time, err
 	c := Claims{}
 	c.UserID = uid
 	c.AuthTime = jwt.NewNumericDate(authTime)
-	c.ID = uniqid()
+	c.ID = uuid.NewString()
 	c.IssuedAt = jwt.NewNumericDate(now)
 	c.ExpiresAt = jwt.NewNumericDate(now.Add(jwtTTL))
 	c.NotBefore = jwt.NewNumericDate(now)

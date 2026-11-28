@@ -1,14 +1,6 @@
 package auth
 
-import (
-	"context"
-
-	"github.com/google/uuid"
-)
-
-func uniqid() string {
-	return uuid.NewString()
-}
+import "context"
 
 // ctxKey is a private type for context keys in this package.
 type ctxKey string
