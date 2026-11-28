@@ -136,7 +136,11 @@ func (a *Manager) LookupHandler(name string) (AnyHandler, error) {
 // MustHandler returns a named handler, panicking if it does not exist.
 // Useful for startup code where handlers are expected to be present.
 func (a *Manager) MustHandler(name string) AnyHandler {
-	return a.handlers.MustGet(name)
+	handler, err := a.LookupHandler(name)
+	if err != nil {
+		panic(err)
+	}
+	return handler
 }
 
 // RegisterHandler registers a non-nil handler under the given name, or returns
