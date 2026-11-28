@@ -137,27 +137,30 @@ func TestBus_ZeroValueRunsAsyncHandlers(t *testing.T) {
 }
 
 func TestBus_AsyncSurvivesCancelledContext(t *testing.T) {
-	bus := NewBus[userCreated]()
-	done := make(chan error, 1)
-	bus.SubscribeAsync(func(ctx context.Context, _ userCreated) error {
-		done <- ctx.Err()
-		return nil
-	})
+	synctest.Test(t, func(t *testing.T) {
+		bus := NewBus[userCreated]()
+		done := make(chan error, 1)
+		bus.SubscribeAsync(func(ctx context.Context, _ userCreated) error {
+			done <- ctx.Err()
+			return nil
+		})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if err := bus.Publish(ctx, userCreated{}); err != nil {
-		t.Fatal(err)
-	}
-
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Errorf("async handler saw ctx error %v", err)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if err := bus.Publish(ctx, userCreated{}); err != nil {
+			t.Fatal(err)
 		}
-	case <-time.After(time.Second):
-		t.Fatal("async handler did not run")
-	}
+		synctest.Wait()
+
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Errorf("async handler saw ctx error %v", err)
+			}
+		default:
+			t.Fatal("async handler did not run")
+		}
+	})
 }
 
 func TestBus_AsyncWrapperCanPublish(t *testing.T) {
