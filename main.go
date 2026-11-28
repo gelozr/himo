@@ -128,6 +128,8 @@ func run() error {
 	case err := <-errc:
 		return err
 	case <-ctx.Done():
+		// Let a second signal interrupt the graceful shutdown.
+		stop()
 	}
 
 	logger.Info("shutting down")
