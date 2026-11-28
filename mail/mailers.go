@@ -68,13 +68,13 @@ func (s *SMTPMailer) Send(ctx context.Context, m *Message) error {
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer stop()
 
-	if err := s.deliver(conn, m, msg); err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return err
+	if err = s.deliver(conn, m, msg); err == nil {
+		return nil
 	}
-	return nil
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	return err
 }
 
 func (s *SMTPMailer) deliver(conn net.Conn, m *Message, msg []byte) error {
