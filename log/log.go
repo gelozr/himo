@@ -20,7 +20,7 @@ type Config struct {
 	LogOutput string // stdout or file (default stdout)
 }
 
-func getConfig(cfg ...Config) Config {
+func getConfig(cfg []Config) Config {
 	var c Config
 	if len(cfg) > 0 {
 		c = cfg[0]
@@ -36,7 +36,7 @@ func getConfig(cfg ...Config) Config {
 
 // New returns a logger and a close function that releases the log file, if any.
 func New(c ...Config) (*slog.Logger, func() error, error) {
-	cfg := getConfig(c...)
+	cfg := getConfig(c)
 
 	var level slog.Level
 	if err := level.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
