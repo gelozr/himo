@@ -67,17 +67,18 @@ func TestTokenGuard_Errors(t *testing.T) {
 		t.Errorf("garbage bearer: got %v, want ErrInvalidToken", err)
 	}
 
-	d := NewJWTDriver([]byte("test-key"))
+	key := []byte("test-key")
+	expiredTokenGuard := NewTokenGuard(staticUsers{}, NewJWTTokens(NewJWTDriver(key)))
 	c := Claims{UserID: "u1", AuthTime: jwt.NewNumericDate(time.Now())}
 	c.ExpiresAt = jwt.NewNumericDate(time.Now().Add(-time.Minute))
-	expired, err := jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString([]byte("test-key"))
+	expired, err := jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewTokenGuard(staticUsers{}, NewJWTTokens(d)).Verify(ctx, expired); !errors.Is(err, ErrTokenExpired) {
+	if _, err := expiredTokenGuard.Verify(ctx, expired); !errors.Is(err, ErrTokenExpired) {
 		t.Errorf("expired bearer: got %v, want ErrTokenExpired", err)
 	}
-	if _, err := NewTokenGuard(staticUsers{}, NewJWTTokens(d)).Refresh(ctx, expired); !errors.Is(err, ErrInvalidToken) || errors.Is(err, ErrTokenExpired) {
+	if _, err := expiredTokenGuard.Refresh(ctx, expired); !errors.Is(err, ErrInvalidToken) || errors.Is(err, ErrTokenExpired) {
 		t.Errorf("expired refresh: got %v, want ErrInvalidToken only", err)
 	}
 }
