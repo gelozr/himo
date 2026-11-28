@@ -65,16 +65,23 @@ func TestJWTDriver_RevokeAndRefresh(t *testing.T) {
 
 func TestJWTDriver_RejectsForeignTokens(t *testing.T) {
 	ctx := context.Background()
-	d := NewJWTDriver([]byte("test-key"))
+	key := []byte("test-key")
+	d := NewJWTDriver(key)
 
-	other, _, _ := NewJWTDriver([]byte("other-key")).Sign("u1", time.Now())
+	other, _, err := NewJWTDriver([]byte("other-key")).Sign("u1", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := d.Validate(ctx, other); !errors.Is(err, ErrJWTInvalid) {
 		t.Errorf("wrong key: got %v, want ErrJWTInvalid", err)
 	}
 
 	c := Claims{UserID: "u1"}
 	c.ExpiresAt = jwt.NewNumericDate(time.Now().Add(time.Hour))
-	hs512, _ := jwt.NewWithClaims(jwt.SigningMethodHS512, c).SignedString([]byte("test-key"))
+	hs512, err := jwt.NewWithClaims(jwt.SigningMethodHS512, c).SignedString(key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := d.Validate(ctx, hs512); !errors.Is(err, ErrJWTInvalid) {
 		t.Errorf("unexpected alg: got %v, want ErrJWTInvalid", err)
 	}
@@ -196,8 +203,12 @@ func TestJWTDriver_RefreshStopsAfterMaxLoginAge(t *testing.T) {
 }
 
 func TestJWTDriver_ParseErrorsAreTyped(t *testing.T) {
-	d := NewJWTDriver([]byte("test-key"))
-	noExp, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{UserID: "u1"}).SignedString([]byte("test-key"))
+	key := []byte("test-key")
+	d := NewJWTDriver(key)
+	noExp, err := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{UserID: "u1"}).SignedString(key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := d.Parse(noExp); !errors.Is(err, ErrJWTInvalid) {
 		t.Errorf("token without exp: got %v, want ErrJWTInvalid", err)
 	}
