@@ -111,26 +111,23 @@ func TestMemorySessionDriver_ZeroValue(t *testing.T) {
 }
 
 func TestMemorySessionDriver_RemovesExpiredSessions(t *testing.T) {
-	ctx := context.Background()
-	d := NewMemorySessionDriver()
+	ctx := t.Context()
+	d := &MemorySessionDriver{
+		sessions: map[string]session{"stale": {uid: "u1", exp: time.Unix(0, 0)}},
+	}
 
-	stale, _ := d.Login(ctx, &User{ID: "u1"})
-	d.sessions[stale] = session{uid: "u1", exp: time.Now().Add(-time.Second)}
-
-	if _, err := d.Validate(ctx, stale); !errors.Is(err, ErrSessionExpired) {
+	if _, err := d.Validate(ctx, "stale"); !errors.Is(err, ErrSessionExpired) {
 		t.Fatalf("got %v, want ErrSessionExpired", err)
 	}
-	if _, ok := d.sessions[stale]; ok {
+	if _, ok := d.sessions["stale"]; ok {
 		t.Error("expired session kept after Validate")
 	}
 
-	abandoned, _ := d.Login(ctx, &User{ID: "u2"})
-	d.sessions[abandoned] = session{uid: "u2", exp: time.Now().Add(-time.Second)}
-	d.lastSweep = time.Time{}
+	d.sessions["abandoned"] = session{uid: "u2", exp: time.Unix(0, 0)}
 	if _, err := d.Login(ctx, &User{ID: "u3"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := d.sessions[abandoned]; ok {
+	if _, ok := d.sessions["abandoned"]; ok {
 		t.Error("expired session kept after Login sweep")
 	}
 }
