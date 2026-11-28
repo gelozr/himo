@@ -13,7 +13,7 @@ func uniqid() string {
 // ctxKey is a private type for context keys in this package.
 type ctxKey string
 
-var userCtxKey = ctxKey("user")
+const userCtxKey ctxKey = "user"
 
 // WithUserCtx stores the authenticated user in the context.
 func WithUserCtx(ctx context.Context, user any) context.Context {
