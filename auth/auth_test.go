@@ -398,10 +398,10 @@ func testLookupHandler(t *testing.T, fn func(auth.HandlerOption, string) (auth.A
 	tests := []struct {
 		name    string
 		handler string
-		wantErr bool
+		wantErr error
 	}{
-		{name: "valid", handler: "test", wantErr: false},
-		{name: "error on not found", handler: "not found", wantErr: true},
+		{name: "valid", handler: "test"},
+		{name: "error on not found", handler: "not found", wantErr: auth.ErrHandlerNotFound},
 	}
 
 	for _, tt := range tests {
@@ -409,18 +409,13 @@ func testLookupHandler(t *testing.T, fn func(auth.HandlerOption, string) (auth.A
 			t.Parallel()
 			h, err := fn(auth.HandlerOption{UserProvider: &MockUserProvider{}, Driver: &MockDriver{}}, tt.handler)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("LookupHandler() expected error = %v, got %v", tt.wantErr, err)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("LookupHandler() error = %v, want %v", err, tt.wantErr)
 			}
 
-			if tt.wantErr && !errors.Is(err, auth.ErrHandlerNotFound) {
-				t.Errorf("LookupHandler() expected error = %v, got %v", auth.ErrHandlerNotFound, err)
-			}
-
-			if !tt.wantErr && h == nil {
+			if tt.wantErr == nil && h == nil {
 				t.Fatalf("LookupHandler() expected non-nil")
 			}
-
 		})
 	}
 }
