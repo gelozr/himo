@@ -43,7 +43,7 @@ var dummyHash = sync.OnceValue(func() string {
 // Its zero value is ready to use.
 type MemoryUserProvider struct {
 	mu    sync.RWMutex
-	users map[string]*User
+	users map[string]User
 }
 
 var _ UserProvider[any, any] = (*MemoryUserProvider)(nil)
@@ -87,8 +87,7 @@ func (p *MemoryUserProvider) GetByEmail(email string) (*User, error) {
 	defer p.mu.RUnlock()
 
 	if u, ok := p.users[strings.ToLower(email)]; ok {
-		cp := *u
-		return &cp, nil
+		return &u, nil
 	}
 	return nil, ErrUserNotFound
 }
@@ -126,9 +125,8 @@ func (p *MemoryUserProvider) RegisterUser(_ context.Context, user any) (any, err
 	}
 
 	if p.users == nil {
-		p.users = make(map[string]*User)
+		p.users = make(map[string]User)
 	}
-	p.users[key] = &stored
-	cp := stored
-	return &cp, nil
+	p.users[key] = stored
+	return &stored, nil
 }
