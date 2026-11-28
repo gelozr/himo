@@ -452,6 +452,17 @@ func TestZeroValueManagerMissingHandler(t *testing.T) {
 			t.Errorf("LookupHandler() = (%v, %v), want (nil, ErrHandlerNotFound)", handler, err)
 		}
 	})
+	t.Run("must", func(t *testing.T) {
+		t.Parallel()
+		defer func() {
+			recovered := recover()
+			err, ok := recovered.(error)
+			if !ok || !errors.Is(err, auth.ErrHandlerNotFound) {
+				t.Errorf("MustHandler() panicked with %v, want ErrHandlerNotFound", recovered)
+			}
+		}()
+		manager.MustHandler("missing")
+	})
 	t.Run("set default", func(t *testing.T) {
 		t.Parallel()
 		if err := manager.SetDefault("missing"); !errors.Is(err, auth.ErrHandlerNotFound) {
