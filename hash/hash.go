@@ -114,18 +114,7 @@ func (m *Manager) SetDefault(mt Method) error {
 	return m.hashers.SetDefault(mt)
 }
 
-var (
-	once          sync.Once
-	defaultHasher *Manager
-)
-
-// getManager initializes and returns a package-level singleton Manager.
-func getManager() *Manager {
-	once.Do(func() {
-		defaultHasher = New()
-	})
-	return defaultHasher
-}
+var getManager = sync.OnceValue(New)
 
 // Hash is a facade that hashes using the default Method.
 func Hash(password string) (string, error) {
