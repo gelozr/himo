@@ -95,14 +95,14 @@ func (t *JWTTokens) Issue(ctx context.Context, userID string) (string, error) {
 // Refresh exchanges a valid token for a new one and revokes the old one.
 func (t *JWTTokens) Refresh(ctx context.Context, refreshToken string) (string, error) {
 	tok, err := t.d.RefreshToken(ctx, refreshToken)
-	if err != nil {
-		// an expired login can't be refreshed, so it's an invalid refresh token, not an expired bearer
-		if errors.Is(err, ErrTokenExpired) {
-			return "", fmt.Errorf("%w: %v", ErrInvalidToken, err)
-		}
-		return "", err
+	if err == nil {
+		return tok.(string), nil
 	}
-	return tok.(string), nil
+	// Refresh reports expiration as an invalid refresh token.
+	if errors.Is(err, ErrTokenExpired) {
+		return "", fmt.Errorf("%w: %v", ErrInvalidToken, err)
+	}
+	return "", err
 }
 
 // Verify returns the user ID of a valid, unrevoked JWT.
