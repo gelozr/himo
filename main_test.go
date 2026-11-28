@@ -84,6 +84,14 @@ func TestRoutes_RegisterLoginMeLogout(t *testing.T) {
 	do("GET", "/me", refreshed.Token, "", http.StatusUnauthorized)
 }
 
+func TestBearerTokenAllowsMultipleSpaces(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/me", nil)
+	r.Header.Set("Authorization", "Bearer   example.token")
+	if token, ok := bearerToken(r); token != "example.token" || !ok {
+		t.Fatalf("bearerToken() = %q, %t, want %q, true", token, ok, "example.token")
+	}
+}
+
 func TestDecodeRejectsOversizeBody(t *testing.T) {
 	for name, body := range map[string]string{
 		"JSON value":          `{"email":"` + strings.Repeat("a", 1<<20) + `"}`,
