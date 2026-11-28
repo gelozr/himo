@@ -99,7 +99,8 @@ func TestMemorySessionDriver_ZeroValue(t *testing.T) {
 		t.Fatalf("Login = %q, %v; want a session ID and no error", id, err)
 	}
 	verified, err := d.Validate(ctx, id)
-	if err != nil || verified.User.(*User).ID != user.ID {
+	verifiedUser, ok := verified.User.(*User)
+	if err != nil || !ok || verifiedUser == nil || verifiedUser.ID != user.ID {
 		t.Fatalf("Validate = %v, %v; want user %q", verified, err, user.ID)
 	}
 	if err := d.Logout(ctx, id); err != nil {
