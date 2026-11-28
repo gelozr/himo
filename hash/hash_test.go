@@ -132,6 +132,18 @@ func TestManager_ZeroValueMissingHasher(t *testing.T) {
 	})
 }
 
+func TestManager_ZeroValueMustHasher(t *testing.T) {
+	var manager hash.Manager
+	defer func() {
+		recovered := recover()
+		err, ok := recovered.(error)
+		if !ok || !errors.Is(err, hash.ErrHasherNotFound) {
+			t.Errorf("MustHasher() panic = %v, want ErrHasherNotFound", recovered)
+		}
+	}()
+	manager.MustHasher(hash.Bcrypt)
+}
+
 func TestManager_ZeroValueHash(t *testing.T) {
 	var manager hash.Manager
 	if _, err := manager.Hash("password"); !errors.Is(err, hash.ErrHasherNotFound) {

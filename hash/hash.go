@@ -85,7 +85,11 @@ func (m *Manager) Hasher(mt Method) (Hasher, error) {
 
 // MustHasher returns a Hasher for the Method or panics if not registered.
 func (m *Manager) MustHasher(mt Method) Hasher {
-	return m.hashers.MustGet(mt)
+	hasher, err := m.Hasher(mt)
+	if err != nil {
+		panic(err)
+	}
+	return hasher
 }
 
 // Extend registers a new Hasher under the given Method, overwriting if existing.
