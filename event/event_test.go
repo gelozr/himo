@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -190,19 +191,21 @@ func TestBus_AsyncWrapperCanPublish(t *testing.T) {
 }
 
 func TestBus_WaitForAsyncHandlers(t *testing.T) {
-	bus := NewBus[userCreated]()
-	var done bool
-	bus.SubscribeAsync(func(context.Context, userCreated) error {
-		time.Sleep(50 * time.Millisecond)
-		done = true
-		return nil
-	})
+	synctest.Test(t, func(t *testing.T) {
+		bus := NewBus[userCreated]()
+		var done bool
+		bus.SubscribeAsync(func(context.Context, userCreated) error {
+			time.Sleep(50 * time.Millisecond)
+			done = true
+			return nil
+		})
 
-	if err := bus.Publish(context.Background(), userCreated{}); err != nil {
-		t.Fatal(err)
-	}
-	bus.Wait()
-	if !done {
-		t.Error("Wait returned before the async handler finished")
-	}
+		if err := bus.Publish(context.Background(), userCreated{}); err != nil {
+			t.Fatal(err)
+		}
+		bus.Wait()
+		if !done {
+			t.Error("Wait returned before the async handler finished")
+		}
+	})
 }
