@@ -165,7 +165,7 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 	for i, a := range m.To {
 		to[i] = formatAddress(a)
 	}
-	domain := m.From.Address[strings.LastIndex(m.From.Address, "@")+1:]
+	domain := addressDomain(m.From.Address)
 
 	var (
 		sb      strings.Builder
@@ -289,7 +289,7 @@ func checkAddress(a Address) error {
 	if !mailbox.Valid(a.Address) {
 		return fmt.Errorf("invalid address %q", a.Address)
 	}
-	domain := a.Address[strings.LastIndex(a.Address, "@")+1:]
+	domain := addressDomain(a.Address)
 	if strings.HasPrefix(domain, "[") {
 		tag, _, hasColon := strings.Cut(domain, ":")
 		if hasColon && !strings.EqualFold(tag, "[IPv6") {
@@ -303,6 +303,10 @@ func checkAddress(a Address) error {
 		}
 	}
 	return nil
+}
+
+func addressDomain(address string) string {
+	return address[strings.LastIndex(address, "@")+1:]
 }
 
 func formatAddress(a Address) string {
