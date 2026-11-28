@@ -168,7 +168,7 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 	domain := addressDomain(m.From.Address)
 
 	var (
-		sb      strings.Builder
+		message bytes.Buffer
 		tooLong string
 	)
 	writeHeader := func(k, v string) {
@@ -185,7 +185,7 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 				tooLong = k
 			}
 		}
-		sb.WriteString(line + "\r\n")
+		message.WriteString(line + "\r\n")
 	}
 	writeHeader("MIME-Version", "1.0")
 	writeHeader("Date", now.Format(time.RFC1123Z))
@@ -200,10 +200,10 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 	if tooLong != "" {
 		return nil, fmt.Errorf("header %s is longer than 998 characters", tooLong)
 	}
-	sb.WriteString("\r\n")
-	sb.Write(body)
+	message.WriteString("\r\n")
+	message.Write(body)
 
-	return []byte(sb.String()), nil
+	return message.Bytes(), nil
 }
 
 // validateMessage rejects messages that can't be sent, and addresses or
