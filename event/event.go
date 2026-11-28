@@ -42,11 +42,10 @@ func (r *Broker) RegisterBus(bus Publisher) {
 
 // Publish sends event to the bus registered for its dynamic type.
 func (r *Broker) Publish(ctx context.Context, event any) error {
-	if event == nil {
+	t := reflect.TypeOf(event)
+	if t == nil {
 		return errors.New("event is nil")
 	}
-
-	t := reflect.TypeOf(event)
 
 	r.mu.RLock()
 	bus, ok := r.buses[t]
