@@ -172,6 +172,9 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 		tooLong string
 	)
 	writeHeader := func(k, v string) {
+		if tooLong != "" {
+			return
+		}
 		line := k + ": " + v
 		if k == "Subject" {
 			if encoded := mime.QEncoding.Encode("utf-8", v); encoded != v {
@@ -181,8 +184,9 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 			}
 		}
 		for l := range strings.SplitSeq(line, "\r\n") {
-			if len(l) > maxHeaderLineLength && tooLong == "" {
+			if len(l) > maxHeaderLineLength {
 				tooLong = k
+				return
 			}
 		}
 		message.WriteString(line + "\r\n")
@@ -199,7 +203,7 @@ func buildMessage(m *Message, now time.Time) ([]byte, error) {
 	}
 	writeHeader("Content-Type", "multipart/alternative; boundary="+boundary)
 	if tooLong != "" {
-		return nil, fmt.Errorf("header %s is longer than 998 characters", tooLong)
+		return nil, fmt.Errorf("header %s is longer than %d characters", tooLong, maxHeaderLineLength)
 	}
 	message.WriteString("\r\n")
 	message.Write(body)
