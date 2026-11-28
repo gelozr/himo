@@ -235,6 +235,7 @@ func TestSMTPMailer_SendRequiresSMTPUTF8(t *testing.T) {
 		{name: "sender", from: "fröm@example.com", to: "to@example.com"},
 		{name: "second recipient", from: "from@example.com", to: "tö@example.com"},
 		{name: "extension advertised", from: "fröm@example.com", to: "tö@example.com", extensions: []string{"SMTPUTF8", "8BITMIME"}},
+		{name: "quoted local parts", from: `"fröm desk"@example.com`, to: `"受 付"@example.com`, extensions: []string{"SMTPUTF8", "8BITMIME"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mailer, got := fakeSMTP(t, false, tc.extensions...)
@@ -331,6 +332,8 @@ func TestBuildMessage_RejectsNonBareMailboxes(t *testing.T) {
 		"\"bad\tspace\"@example.com",
 		"\"bad\\\tspace\"@example.com",
 		"\"bad\r\nspace\"@example.com",
+		`"bad\é"@example.com`,
+		"\"bad\xff\"@example.com",
 		`sender@[2001:db8::1]`,
 		`"sender@desk"@[::1]`,
 		`sender@[IPv6:192.0.2.1]`,

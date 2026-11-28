@@ -109,6 +109,7 @@ func TestMailFrom(t *testing.T) {
 		{`"Welcome <Team>" <"desk@\"room\" >"@example.com>`, "Welcome <Team>", `"desk@\"room\" >"@example.com`},
 		{`"Welcome" <"@desk"@example.com>`, "Welcome", `"@desk"@example.com`},
 		{`Welcome <""@example.com>`, "Welcome", `""@example.com`},
+		{`Welcome <"fröm desk"@example.com>`, "Welcome", `"fröm desk"@example.com`},
 		{`noreply@[IPv6:2001:db8::1]`, "himo", `noreply@[IPv6:2001:db8::1]`},
 		{`"Welcome @[IPv6:2001:db8::1]" <"desk@room"@[ipv6:2001:db8::1]>`, "Welcome @[IPv6:2001:db8::1]", `"desk@room"@[ipv6:2001:db8::1]`},
 		{`quoted-local@example.com ("other"@example.net)`, `"other"@example.net`, "quoted-local@example.com"},
