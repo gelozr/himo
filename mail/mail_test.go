@@ -428,6 +428,22 @@ func TestManager_RejectsNilDriver(t *testing.T) {
 	}
 }
 
+func TestManager_ZeroValue(t *testing.T) {
+	var m Manager
+	if _, err := m.Mailer(SMTP); !errors.Is(err, ErrMailerNotFound) {
+		t.Errorf("Mailer(SMTP) = %v, want ErrMailerNotFound", err)
+	}
+	if err := m.Send(context.Background(), testMessage()); !errors.Is(err, ErrMailerNotFound) {
+		t.Errorf("Send() = %v, want ErrMailerNotFound", err)
+	}
+	if err := m.SetDefaultDriver(SMTP); !errors.Is(err, ErrMailerNotFound) {
+		t.Errorf("SetDefaultDriver(SMTP) = %v, want ErrMailerNotFound", err)
+	}
+	if err := m.RegisterDriver(SMTP, NewSMTPMailer(Config{})); err == nil {
+		t.Error("RegisterDriver(SMTP) accepted an uninitialized manager")
+	}
+}
+
 type mailerFunc func(context.Context, *Message) error
 
 func (f mailerFunc) Send(ctx context.Context, m *Message) error { return f(ctx, m) }
