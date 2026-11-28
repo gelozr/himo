@@ -55,6 +55,9 @@ func (s *SMTPMailer) Send(ctx context.Context, m *Message) error {
 	if err != nil {
 		return err
 	}
+	if s.Host == "" {
+		return errors.New("SMTP host is required")
+	}
 
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(s.Host, strconv.Itoa(s.Port)))

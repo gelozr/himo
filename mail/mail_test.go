@@ -225,6 +225,17 @@ func TestSMTPMailer_Send(t *testing.T) {
 	}
 }
 
+func TestSMTPMailer_RejectsEmptyHost(t *testing.T) {
+	local, _ := fakeSMTP(t, false)
+	mailer := NewSMTPMailer(Config{MailPort: local.Port})
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+
+	if err := mailer.Send(ctx, testMessage()); err == nil || err.Error() != "SMTP host is required" {
+		t.Fatalf("Send() = %v, want a missing SMTP host error", err)
+	}
+}
+
 func TestSMTPMailer_SendRequiresSMTPUTF8(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
