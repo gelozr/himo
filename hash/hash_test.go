@@ -201,10 +201,10 @@ func TestManager_SetDefault(t *testing.T) {
 	tests := []struct {
 		name    string
 		method  hash.Method
-		wantErr bool
+		wantErr error
 	}{
 		{name: "hasher found", method: hash.Method("mock")},
-		{name: "hasher not found", method: hash.Method("not found hasher"), wantErr: true},
+		{name: "hasher not found", method: hash.Method("not found hasher"), wantErr: hash.ErrHasherNotFound},
 	}
 
 	for _, tt := range tests {
@@ -216,12 +216,8 @@ func TestManager_SetDefault(t *testing.T) {
 			}
 
 			err := hasher.SetDefault(tt.method)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("SetDefault() expected error = %v, got %v", tt.wantErr, err)
-			}
-
-			if tt.wantErr && !errors.Is(err, hash.ErrHasherNotFound) {
-				t.Errorf("SetDefault() expected error = %v, got %v", hash.ErrHasherNotFound, err)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("SetDefault() error = %v, want %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -423,10 +419,10 @@ func TestSetDefault(t *testing.T) {
 	tests := []struct {
 		name    string
 		method  hash.Method
-		wantErr bool
+		wantErr error
 	}{
 		{name: "hasher found", method: hash.Method("mock")},
-		{name: "hasher not found", method: hash.Method("not found hasher"), wantErr: true},
+		{name: "hasher not found", method: hash.Method("not found hasher"), wantErr: hash.ErrHasherNotFound},
 	}
 
 	for _, tt := range tests {
@@ -438,12 +434,8 @@ func TestSetDefault(t *testing.T) {
 			}
 
 			err := hash.SetDefault(tt.method)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("SetDefault() expected error = %v, got %v", tt.wantErr, err)
-			}
-
-			if tt.wantErr && !errors.Is(err, hash.ErrHasherNotFound) {
-				t.Errorf("SetDefault() expected error = %v, got %v", hash.ErrHasherNotFound, err)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("SetDefault() error = %v, want %v", err, tt.wantErr)
 			}
 		})
 	}
