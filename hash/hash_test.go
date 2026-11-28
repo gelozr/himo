@@ -190,26 +190,7 @@ func TestManager_HashCheckSelectedBuiltinHasher(t *testing.T) {
 
 	for _, method := range hashers {
 		t.Run(string(method), func(t *testing.T) {
-			hashed, err := hasher.MustHasher(method).Hash(password)
-			if err != nil {
-				t.Fatalf("Hash() error = %v, want nil", err)
-			}
-
-			ok, err := hasher.MustHasher(method).Check(password, hashed)
-			if err != nil {
-				t.Fatalf("Check() error = %v, want nil", err)
-			}
-			if !ok {
-				t.Errorf("Check() expected true, got false")
-			}
-
-			ok, err = hasher.MustHasher(method).Check("wrong password", hashed)
-			if err != nil {
-				t.Fatalf("Check() error = %v, want nil", err)
-			}
-			if ok {
-				t.Errorf("Check(wrong password) expected false, got true")
-			}
+			assertRoundTrip(t, hasher.MustHasher(method), password)
 		})
 	}
 }
@@ -433,26 +414,7 @@ func TestHashAndCheck_WithSelectedBuiltinHasher(t *testing.T) {
 
 	for _, method := range hashers {
 		t.Run(string(method), func(t *testing.T) {
-			hashed, err := hash.MustHasher(method).Hash(password)
-			if err != nil {
-				t.Fatalf("Hash() error = %v, want nil", err)
-			}
-
-			ok, err := hash.MustHasher(method).Check(password, hashed)
-			if err != nil {
-				t.Fatalf("Check() error = %v, want nil", err)
-			}
-			if !ok {
-				t.Errorf("Check() expected true, got false")
-			}
-
-			ok, err = hash.MustHasher(method).Check("wrong password", hashed)
-			if err != nil {
-				t.Fatalf("Check() error = %v, want nil", err)
-			}
-			if ok {
-				t.Errorf("Check(wrong password) expected false, got true")
-			}
+			assertRoundTrip(t, hash.MustHasher(method), password)
 		})
 	}
 }
