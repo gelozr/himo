@@ -48,10 +48,19 @@ func TestNew_FilePathWithParentTraversal(t *testing.T) {
 }
 
 func TestNew_RejectsBadConfig(t *testing.T) {
-	for _, c := range []Config{{LogLevel: "loud"}, {LogFormat: "xml"}, {LogOutput: "printer"}} {
-		if _, _, err := New(c); err == nil {
-			t.Errorf("%+v: expected error", c)
-		}
+	for _, tc := range []struct {
+		name   string
+		config Config
+	}{
+		{name: "level", config: Config{LogLevel: "loud"}},
+		{name: "format", config: Config{LogFormat: "xml"}},
+		{name: "output", config: Config{LogOutput: "printer"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, _, err := New(tc.config); err == nil {
+				t.Fatalf("New(%+v) succeeded, want an error", tc.config)
+			}
+		})
 	}
 }
 
