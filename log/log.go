@@ -3,6 +3,7 @@
 package log
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"log/slog"
@@ -25,21 +26,10 @@ func getConfig(cfg ...Config) Config {
 		c = cfg[0]
 	}
 
-	if c.LogLevel == "" {
-		c.LogLevel = "info"
-	}
-
-	if c.LogFormat == "" {
-		c.LogFormat = "text"
-	}
-
-	if c.LogOutput == "" {
-		c.LogOutput = "stdout"
-	}
-
-	if c.LogPath == "" {
-		c.LogPath = "./log/app.log"
-	}
+	c.LogLevel = cmp.Or(c.LogLevel, "info")
+	c.LogFormat = cmp.Or(c.LogFormat, "text")
+	c.LogOutput = cmp.Or(c.LogOutput, "stdout")
+	c.LogPath = cmp.Or(c.LogPath, "./log/app.log")
 
 	return c
 }
