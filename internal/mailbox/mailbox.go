@@ -6,6 +6,7 @@ import (
 	"net/mail"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 var quotedLocal = regexp.MustCompile(`"(?:[^"\\]|\\.)*"@`)
@@ -18,8 +19,18 @@ func Valid(address string) bool {
 		if span == nil || span[0] != 0 {
 			return false
 		}
-		for i := range span[1] {
-			if address[i] < ' ' || address[i] > '~' {
+		local := address[1 : span[1]-2]
+		if !utf8.ValidString(local) {
+			return false
+		}
+		for i := 0; i < len(local); i++ {
+			if local[i] == '\\' {
+				i++
+				if local[i] > '~' {
+					return false
+				}
+			}
+			if local[i] < ' ' || local[i] == '\x7f' {
 				return false
 			}
 		}
