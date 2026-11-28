@@ -39,6 +39,15 @@ func TestRoutes_RegisterLoginMeLogout(t *testing.T) {
 		if resp.StatusCode != want {
 			t.Fatalf("%s %s = %d, want %d", method, path, resp.StatusCode, want)
 		}
+		if path == "/me" && want == http.StatusUnauthorized {
+			challenge := `Bearer realm="himo"`
+			if token != "" {
+				challenge += `, error="invalid_token"`
+			}
+			if got := resp.Header.Get("WWW-Authenticate"); got != challenge {
+				t.Errorf("%s %s WWW-Authenticate = %q, want %q", method, path, got, challenge)
+			}
+		}
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
