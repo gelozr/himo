@@ -80,11 +80,11 @@ func (r *Registry[K, V]) SetDefault(name K) error {
 }
 
 func (r *Registry[K, V]) get(name K) (V, error) {
-	if v, ok := r.items[name]; ok {
-		return v, nil
+	v, ok := r.items[name]
+	if !ok {
+		return v, fmt.Errorf("%w: %v", r.notFound, name)
 	}
-	var zero V
-	return zero, fmt.Errorf("%w: %v", r.notFound, name)
+	return v, nil
 }
 
 func (r *Registry[K, V]) set(name K, v V) {
