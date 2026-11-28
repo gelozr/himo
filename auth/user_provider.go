@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/gelozr/himo/hash"
+	"github.com/google/uuid"
 )
 
 // Errors returned by MemoryUserProvider.
@@ -114,7 +115,7 @@ func (p *MemoryUserProvider) RegisterUser(_ context.Context, user any) (any, err
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
-	stored := User{ID: uniqid(), Email: u.Email, Password: hashed}
+	stored := User{ID: uuid.NewString(), Email: u.Email, Password: hashed}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
