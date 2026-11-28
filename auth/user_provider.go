@@ -83,13 +83,15 @@ func (p *MemoryUserProvider) FindByCredentials(_ context.Context, credentials an
 
 // GetByEmail returns a copy of the user with the given email or ErrUserNotFound.
 func (p *MemoryUserProvider) GetByEmail(email string) (*User, error) {
+	key := strings.ToLower(email)
 	p.mu.RLock()
-	defer p.mu.RUnlock()
+	u, ok := p.users[key]
+	p.mu.RUnlock()
 
-	if u, ok := p.users[strings.ToLower(email)]; ok {
-		return &u, nil
+	if !ok {
+		return nil, ErrUserNotFound
 	}
-	return nil, ErrUserNotFound
+	return &u, nil
 }
 
 // RegisterUser stores a copy of the user with a generated ID and hashed password.
