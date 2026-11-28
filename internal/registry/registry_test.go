@@ -29,8 +29,11 @@ func TestRegistry(t *testing.T) {
 	if err := r.SetDefault("missing"); !errors.Is(err, errNotFound) {
 		t.Errorf("SetDefault(missing) = %v, want errNotFound", err)
 	}
-	if err := r.SetDefault("b"); err != nil || r.Default() != 2 {
-		t.Errorf("SetDefault(b) = %v, Default = %d", err, r.Default())
+	if err := r.SetDefault("b"); err != nil {
+		t.Fatalf("SetDefault(b) = %v, want nil", err)
+	}
+	if got := r.Default(); got != 2 {
+		t.Errorf("Default after SetDefault(b) = %d, want 2", got)
 	}
 
 	if _, err := r.Get("missing"); !errors.Is(err, errNotFound) {
