@@ -65,7 +65,7 @@ func (b *Bus[T]) SetAsyncHandler(ah func(Handler[T]) Handler[T]) error {
 // Publish runs every handler in subscription order and joins their errors.
 func (b *Bus[T]) Publish(ctx context.Context, evt any) error {
 	e, ok := evt.(T)
-	if !ok {
+	if !ok && (evt != nil || b.Type().Kind() != reflect.Interface) {
 		return fmt.Errorf("invalid event type: %T", evt)
 	}
 

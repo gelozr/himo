@@ -98,6 +98,25 @@ func TestBus_InterfaceTypeDoesNotPanic(t *testing.T) {
 	}
 }
 
+func TestBus_PublishNilInterface(t *testing.T) {
+	bus := NewBus[namer]()
+	handlerErr := errors.New("handler called")
+	bus.Subscribe(func(_ context.Context, event namer) error {
+		if event != nil {
+			t.Errorf("handler got %v, want nil", event)
+		}
+		return handlerErr
+	})
+
+	var event namer
+	if err := bus.Publish(t.Context(), event); !errors.Is(err, handlerErr) {
+		t.Errorf("Publish returned %v, want %v", err, handlerErr)
+	}
+	if err := NewBus[userCreated]().Publish(t.Context(), nil); err == nil {
+		t.Error("expected error for nil event on a concrete bus")
+	}
+}
+
 func TestBus_ZeroValueRunsAsyncHandlers(t *testing.T) {
 	var bus Bus[userCreated]
 	var got string
