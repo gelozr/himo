@@ -76,13 +76,16 @@ func NewJWTDriver(key []byte) *JWTDriver {
 func (d *JWTDriver) Sign(uid string, authTime time.Time) (string, time.Time, error) {
 	now := time.Now()
 
-	c := Claims{}
-	c.UserID = uid
-	c.AuthTime = jwt.NewNumericDate(authTime)
-	c.ID = uuid.NewString()
-	c.IssuedAt = jwt.NewNumericDate(now)
-	c.ExpiresAt = jwt.NewNumericDate(now.Add(jwtTTL))
-	c.NotBefore = jwt.NewNumericDate(now)
+	c := Claims{
+		UserID:   uid,
+		AuthTime: jwt.NewNumericDate(authTime),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.NewString(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(jwtTTL)),
+			NotBefore: jwt.NewNumericDate(now),
+		},
+	}
 
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
 
