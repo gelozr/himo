@@ -61,10 +61,14 @@ func ParseAddress(value string) (*mail.Address, error) {
 		literal := value[start:end]
 		untagged := "@[" + literal[len("@[IPv6:"):]
 		candidate, parseErr := parseAddress(value[:start] + untagged + value[end:])
-		if parseErr != nil || !strings.HasSuffix(candidate.Address, untagged) {
+		if parseErr != nil {
 			continue
 		}
-		candidate.Address = strings.TrimSuffix(candidate.Address, untagged) + literal
+		local, ok := strings.CutSuffix(candidate.Address, untagged)
+		if !ok {
+			continue
+		}
+		candidate.Address = local + literal
 		if Valid(candidate.Address) {
 			return candidate, nil
 		}
@@ -88,10 +92,14 @@ func parseAddress(value string) (*mail.Address, error) {
 		offset = start + 1
 		// A quote can be in a name or comment. Only restore it if the probe became the local part.
 		withProbe, probeErr := mail.ParseAddress(value[:start] + probe + value[end:])
-		if probeErr != nil || !strings.HasPrefix(withProbe.Address, probe) {
+		if probeErr != nil {
 			continue
 		}
-		withProbe.Address = value[start:end] + strings.TrimPrefix(withProbe.Address, probe)
+		domain, ok := strings.CutPrefix(withProbe.Address, probe)
+		if !ok {
+			continue
+		}
+		withProbe.Address = value[start:end] + domain
 		if !Valid(withProbe.Address) {
 			return nil, fmt.Errorf("invalid address %q", withProbe.Address)
 		}
