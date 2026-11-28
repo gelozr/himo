@@ -39,12 +39,12 @@ func NewBaseAuth[C, U, P any](userProvider UserProvider[C, U], driver Validator[
 
 // NewSessionAuth creates a BaseAuth whose driver is checked at compile time to support Login/Logout.
 func NewSessionAuth[C, U, P any, D SessionDriver[U, P], UP UserProvider[C, U]](driver D, userProvider UP) *BaseAuth[C, U, P] {
-	return NewBaseAuth[C, U, P](userProvider, driver)
+	return NewBaseAuth(userProvider, driver)
 }
 
 // NewTokenAuth creates a BaseAuth whose driver is checked at compile time to support IssueToken.
 func NewTokenAuth[C, U, P any, D TokenDriver[U, P], UP UserProvider[C, U]](driver D, userProvider UP) *BaseAuth[C, U, P] {
-	return NewBaseAuth[C, U, P](userProvider, driver)
+	return NewBaseAuth(userProvider, driver)
 }
 
 // Authenticate attempts to find and return a user based on the
