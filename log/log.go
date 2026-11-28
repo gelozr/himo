@@ -49,11 +49,12 @@ func New(c ...Config) (*slog.Logger, func() error, error) {
 	}
 
 	var (
-		w       io.Writer = os.Stdout
-		closeFn           = func() error { return nil }
+		w       io.Writer
+		closeFn func() error
 	)
 	switch strings.ToLower(cfg.LogOutput) {
 	case "stdout":
+		w, closeFn = os.Stdout, func() error { return nil }
 	case "file":
 		if dir, _ := filepath.Split(cfg.LogPath); dir != "" {
 			if err := os.MkdirAll(dir, 0o750); err != nil {
