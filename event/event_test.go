@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -37,8 +38,8 @@ func TestBroker_RoutesByType(t *testing.T) {
 	if err := b.Publish(ctx, userCreated{ID: "1"}); err == nil || err.Error() != "boom" {
 		t.Errorf("Publish error = %v, want boom", err)
 	}
-	if len(got) != 1 || got[0] != "1" {
-		t.Errorf("handler got %v", got)
+	if want := []string{"1"}; !slices.Equal(got, want) {
+		t.Errorf("handler got %v, want %v", got, want)
 	}
 
 	if err := b.Publish(ctx, &userCreated{}); err == nil {
